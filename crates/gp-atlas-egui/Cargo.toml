@@ -1,0 +1,19 @@
+[package]
+name = "gp-atlas-egui"
+description = "GP Atlas desktop frontend (egui). UI arrives in M1."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "gp-atlas"
+path = "src/main.rs"
+
+[dependencies]
+gp-atlas-core.workspace = true
+
+[lints]
+workspace = true

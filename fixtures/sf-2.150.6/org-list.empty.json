@@ -1,0 +1,13 @@
+{
+  "status": 0,
+  "result": {
+    "other": [],
+    "sandboxes": [],
+    "nonScratchOrgs": [],
+    "devHubs": [],
+    "scratchOrgs": []
+  },
+  "warnings": [
+    "Secrets are now hidden from 'sf org list' command output. Use the 'sf org auth' commands instead. As a temporary workaround, you can set SF_TEMP_SHOW_SECRETS=true to render these secrets. This workaround will be removed in an upcoming release."
+  ]
+}

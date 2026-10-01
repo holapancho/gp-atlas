@@ -1,0 +1,1962 @@
+{
+  "schema": 1,
+  "cli_version": "@salesforce/cli/2.150.6",
+  "generated_by": "tools/extract-manifest (from `sf commands --json`)",
+  "commands": [
+    {
+      "id": "alias:list",
+      "plugin": "@salesforce/plugin-settings",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:alias:list"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        }
+      ]
+    },
+    {
+      "id": "commands",
+      "plugin": "@oclif/plugin-commands",
+      "state": null,
+      "hidden": false,
+      "aliases": [],
+      "deprecate_aliases": false,
+      "flags": [
+        {
+          "name": "columns",
+          "type": "option",
+          "char": "c",
+          "required": false,
+          "options": [
+            "id",
+            "plugin",
+            "summary",
+            "type"
+          ],
+          "default": null,
+          "multiple": true,
+          "delimiter": ",",
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "deprecated",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "extended",
+          "type": "boolean",
+          "char": "x",
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "hidden",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "no-truncate",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "sort",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": [
+            "id",
+            "plugin",
+            "summary",
+            "type"
+          ],
+          "default": "id",
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "tree",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "config:get",
+      "plugin": "@salesforce/plugin-settings",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:config:get"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "verbose",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "org:list",
+      "plugin": "@salesforce/plugin-org",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:org:list"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "all",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "clean",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "no-prompt",
+          "type": "boolean",
+          "char": "p",
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "noprompt"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "skip-connection-status",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "skipconnectionstatus"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "verbose",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "package1:version:create:get",
+      "plugin": "@salesforce/plugin-packaging",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:package1:version:create:get"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "api-version",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "apiversion"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "request-id",
+          "type": "option",
+          "char": "i",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "requestid"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "target-org",
+          "type": "option",
+          "char": "o",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "targetusername",
+            "u"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "package1:version:display",
+      "plugin": "@salesforce/plugin-packaging",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:package1:version:display"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "api-version",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "apiversion"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "package-version-id",
+          "type": "option",
+          "char": "i",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "packageversionid"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "target-org",
+          "type": "option",
+          "char": "o",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "targetusername",
+            "u"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "package1:version:list",
+      "plugin": "@salesforce/plugin-packaging",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:package1:version:list"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "api-version",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "apiversion"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "package-id",
+          "type": "option",
+          "char": "i",
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "packageid"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "target-org",
+          "type": "option",
+          "char": "o",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "targetusername",
+            "u"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "package:installed:list",
+      "plugin": "@salesforce/plugin-packaging",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:package:installed:list"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "api-version",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "apiversion"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "target-org",
+          "type": "option",
+          "char": "o",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "targetusername",
+            "u"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "package:list",
+      "plugin": "@salesforce/plugin-packaging",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:package:list"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "api-version",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "apiversion"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "target-dev-hub",
+          "type": "option",
+          "char": "v",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "targetdevhubusername",
+            "target-hub-org"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "verbose",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "package:push-upgrade:list",
+      "plugin": "@salesforce/plugin-packaging",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:package:push-upgrade:list"
+      ],
+      "deprecate_aliases": false,
+      "flags": [
+        {
+          "name": "api-version",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "apiversion"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "package",
+          "type": "option",
+          "char": "p",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "scheduled-last-days",
+          "type": "option",
+          "char": "l",
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "scheduledlastdays"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "show-push-migrations-only",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "status",
+          "type": "option",
+          "char": "s",
+          "required": false,
+          "options": [
+            "Created",
+            "Cancelled",
+            "Pending",
+            "In Progress",
+            "Failed",
+            "Succeeded"
+          ],
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "target-dev-hub",
+          "type": "option",
+          "char": "v",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "targetdevhubusername",
+            "target-hub-org"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "package:version:create:list",
+      "plugin": "@salesforce/plugin-packaging",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:package:version:create:list"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "api-version",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "apiversion"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "created-last-days",
+          "type": "option",
+          "char": "c",
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "createdlastdays"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "show-conversions-only",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "status",
+          "type": "option",
+          "char": "s",
+          "required": false,
+          "options": [
+            "Queued",
+            "InProgress",
+            "Success",
+            "Error"
+          ],
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "target-dev-hub",
+          "type": "option",
+          "char": "v",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "targetdevhubusername",
+            "target-hub-org"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "verbose",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "package:version:create:report",
+      "plugin": "@salesforce/plugin-packaging",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:package:version:create:report"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "api-version",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "apiversion"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "package-create-request-id",
+          "type": "option",
+          "char": "i",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "packagecreaterequestid"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "target-dev-hub",
+          "type": "option",
+          "char": "v",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "targetdevhubusername",
+            "target-hub-org"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "package:version:displayancestry",
+      "plugin": "@salesforce/plugin-packaging",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:package:version:displayancestry"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "api-version",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "apiversion"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "dot-code",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "dotcode"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "package",
+          "type": "option",
+          "char": "p",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "target-dev-hub",
+          "type": "option",
+          "char": "v",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "targetdevhubusername",
+            "target-hub-org"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "verbose",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "package:version:displaydependencies",
+      "plugin": "@salesforce/plugin-packaging",
+      "state": null,
+      "hidden": false,
+      "aliases": [],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "api-version",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "apiversion"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "edge-direction",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": [
+            "root-first",
+            "root-last"
+          ],
+          "default": "root-first",
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "installation-key",
+          "type": "option",
+          "char": "k",
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "package",
+          "type": "option",
+          "char": "p",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "target-dev-hub",
+          "type": "option",
+          "char": "v",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "targetdevhubusername",
+            "target-hub-org"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "verbose",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "package:version:list",
+      "plugin": "@salesforce/plugin-packaging",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:package:version:list"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "api-version",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "apiversion"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "branch",
+          "type": "option",
+          "char": "b",
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "concise",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "created-last-days",
+          "type": "option",
+          "char": "c",
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "createdlastdays"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "modified-last-days",
+          "type": "option",
+          "char": "m",
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "modifiedlastdays"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "order-by",
+          "type": "option",
+          "char": "o",
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "orderby"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "packages",
+          "type": "option",
+          "char": "p",
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "released",
+          "type": "boolean",
+          "char": "r",
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "show-conversions-only",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "target-dev-hub",
+          "type": "option",
+          "char": "v",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "targetdevhubusername",
+            "target-hub-org"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "verbose",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "package:version:report",
+      "plugin": "@salesforce/plugin-packaging",
+      "state": null,
+      "hidden": false,
+      "aliases": [
+        "force:package:version:report"
+      ],
+      "deprecate_aliases": true,
+      "flags": [
+        {
+          "name": "api-version",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "apiversion"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "flags-dir",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "loglevel",
+          "type": "option",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": true,
+          "hidden": true
+        },
+        {
+          "name": "package",
+          "type": "option",
+          "char": "p",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "target-dev-hub",
+          "type": "option",
+          "char": "v",
+          "required": true,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [
+            "targetdevhubusername",
+            "target-hub-org"
+          ],
+          "deprecate_aliases": true,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "verbose",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "plugins",
+      "plugin": "@oclif/plugin-plugins",
+      "state": null,
+      "hidden": false,
+      "aliases": [],
+      "deprecate_aliases": false,
+      "flags": [
+        {
+          "name": "core",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "version",
+      "plugin": "@oclif/plugin-version",
+      "state": null,
+      "hidden": false,
+      "aliases": [],
+      "deprecate_aliases": false,
+      "flags": [
+        {
+          "name": "json",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        },
+        {
+          "name": "verbose",
+          "type": "boolean",
+          "char": null,
+          "required": false,
+          "options": null,
+          "default": null,
+          "multiple": false,
+          "delimiter": null,
+          "aliases": [],
+          "deprecate_aliases": false,
+          "deprecated": false,
+          "hidden": false
+        }
+      ]
+    }
+  ]
+}

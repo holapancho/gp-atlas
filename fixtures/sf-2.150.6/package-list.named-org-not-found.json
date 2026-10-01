@@ -1,0 +1,12 @@
+{
+  "name": "NamedOrgNotFoundError",
+  "message": "Parsing --target-dev-hub \n\tNo authorization information found for nobody@example.com.\nSee more help with --help",
+  "exitCode": 2,
+  "context": "PackageListCommand",
+  "stack": "NamedOrgNotFoundError: Parsing --target-dev-hub \n\tNo authorization information found for nobody@example.com.\nSee more help with --help\n    at SfCommandError.from (file:///opt/sf/node_modules/@salesforce/cli/node_modules/@salesforce/sf-plugins-core/lib/SfCommandError.js:48:16)\n    at PackageListCommand.catch (file:///opt/sf/node_modules/@salesforce/cli/node_modules/@salesforce/sf-plugins-core/lib/sfCommand.js:333:47)\n    at PackageListCommand._run (/opt/sf/node_modules/@salesforce/cli/node_modules/@oclif/core/lib/command.js:187:29)\n    at async Config.runCommand (/opt/sf/node_modules/@salesforce/cli/node_modules/@oclif/core/lib/config/config.js:389:25)\n    at async run (/opt/sf/node_modules/@salesforce/cli/node_modules/@oclif/core/lib/main.js:97:16)\n    at async file:///opt/sf/node_modules/@salesforce/cli/bin/run.js:15:1",
+  "cause": "undefined",
+  "warnings": [],
+  "code": "NamedOrgNotFoundError",
+  "status": 2,
+  "commandName": "PackageListCommand"
+}

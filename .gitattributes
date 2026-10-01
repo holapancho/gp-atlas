@@ -1,0 +1,2 @@
+# Keep LF everywhere: the embedded manifest and fixtures are compared byte-for-byte.
+* text=auto eol=lf

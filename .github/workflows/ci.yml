@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: fmt / clippy / test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+
+  # SPEC §11.3: the manifest must equal what sf 2.150.6 itself reports.
+  sf-contract:
+    name: sf-contract (@salesforce/cli@2.150.6)
+    runs-on: ubuntu-latest
+    env:
+      SF_DISABLE_TELEMETRY: "true"
+      SF_SKIP_NEW_VERSION_CHECK: "true"
+      SF_AUTOUPDATE_DISABLE: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install sf 2.150.6
+        run: npm install --global @salesforce/cli@2.150.6
+      - name: Assert sf version
+        run: |
+          found="$(sf version --json | jq -r .cliVersion)"
+          if [ "$found" != "@salesforce/cli/2.150.6" ]; then
+            echo "::error::expected @salesforce/cli/2.150.6, found $found"
+            exit 1
+          fi
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: Regenerate manifest
+        run: cargo run --locked -p extract-manifest -- --out manifest/sf-2.150.6.json
+      - name: Generated manifest must equal the committed one
+        run: git diff --exit-code manifest/sf-2.150.6.json
+      - name: Contract tests (version, plugin, manifest, blocklist)
+        run: cargo test --locked -p gp-atlas-contract-tests -- --ignored
+
+  deny:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - run: cargo audit

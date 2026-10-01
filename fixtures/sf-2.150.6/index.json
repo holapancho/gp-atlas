@@ -1,0 +1,30 @@
+{
+  "cases": [
+    {
+      "argv": ["version", "--json"],
+      "stdout": "version.json"
+    },
+    {
+      "argv": ["plugins", "--json"],
+      "stdout": "plugins.json"
+    },
+    {
+      "argv": ["org", "list", "--json"],
+      "stdout": "org-list.empty.json"
+    },
+    {
+      "argv": ["alias", "list", "--json"],
+      "stdout": "alias-list.empty.json"
+    },
+    {
+      "argv": ["package", "list", "--target-dev-hub", "nobody@example.com", "--json"],
+      "stdout": "package-list.named-org-not-found.json",
+      "exit_code": 2
+    },
+    {
+      "argv": ["package1", "version", "list", "--target-org", "nobody@example.com", "--json"],
+      "stdout": "package1-version-list.named-org-not-found.json",
+      "exit_code": 2
+    }
+  ]
+}
