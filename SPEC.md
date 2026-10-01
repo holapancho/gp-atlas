@@ -31,7 +31,7 @@ You are a senior Rust engineer building **GP Atlas**: a small, cross-platform de
 
 - UI toolkit: **egui/eframe** (native window, virtualized tables via `egui_extras`). All logic lives in a UI-free crate so a TUI frontend can be added later.
 - Binary name: `gp-atlas`. Crate names: `gp-atlas-core`, `gp-atlas-egui`.
-- License: `MIT OR Apache-2.0`. README must say "Not affiliated with or endorsed by Salesforce." Do not use "Salesforce" or "sf" as part of the product name.
+- License: `MIT`. README must say "Not affiliated with or endorsed by Salesforce." Do not use "Salesforce" or "sf" as part of the product name.
 
 ---
 
