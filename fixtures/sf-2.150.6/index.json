@@ -17,6 +17,14 @@
       "stdout": "alias-list.empty.json"
     },
     {
+      "argv": ["package", "list", "--target-dev-hub", "fake0009", "--json"],
+      "stdout": "package-list.real.json"
+    },
+    {
+      "argv": ["package", "list", "--target-dev-hub", "fake0009", "--verbose", "--json"],
+      "stdout": "package-list.real.json"
+    },
+    {
       "argv": ["package", "list", "--target-dev-hub", "nobody@example.com", "--json"],
       "stdout": "package-list.named-org-not-found.json",
       "exit_code": 2
