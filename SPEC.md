@@ -98,7 +98,7 @@ Binary resolution order: `GP_ATLAS_SF_BIN` env var → setting in app config →
 |---|------|--------------|
 | F1 | `sf version --json` → `cliVersion: "@salesforce/cli/2.150.6"`. | Ran it. |
 | F2 | Bundled core plugins include `packaging 3.0.6`, `org 6.0.11`, `data 5.1.7`, `auth 5.0.6`, `info 4.0.9`. | `sf plugins --core`. |
-| F3 | `sf plugins --json` and `sf plugins --core --json` print a **bare JSON array** (no `{status,result}` envelope). Entries have `name`, `version`, `type` (`core` observed). `sf plugins --json` also lists the root `@salesforce/cli` and all core plugins. | Ran both. |
+| F3 | `sf plugins --json` and `sf plugins --core --json` print a **bare JSON array** (no `{status,result}` envelope). Entries have `name`, `version`, `type`. Observed on a clean install: 29 × `core`, 10 × `jit` (on-demand plugins not yet installed). See F31 for `user`/`link`/`dev`. `sf plugins --json` also lists the root `@salesforce/cli` and all core plugins. | Ran both. |
 | F4 | `sf commands --json` returns a bare array of **273** command objects (`id`, `aliases`, `flags{name→{type,char,required,options,default,aliases,deprecated…}}`, `summary`, `state`…). ~1.3 MB, ~3.5 s. | Ran it. |
 | F5 | Timings (test machine): `sf version --json` ≈ 1.0 s; any single command ≈ 2.5 s+. Process startup dominates → cache, limit concurrency, show progress. | `time`. |
 | F6 | Success envelope for envelope-style commands: `{"status":0,"result":…,"warnings":[…]}` (observed for `org list`, `alias list`, `config get`). | Ran them. |
@@ -119,10 +119,22 @@ Binary resolution order: `GP_ATLAS_SF_BIN` env var → setting in app config →
 | F21 | `package version displaydependencies --json` returns a **DOT (GraphViz) string**. `package version displayancestry --dot-code --json` returns a DOT string; without `--dot-code` it returns an ancestry JSON structure. | Plugin source. |
 | F22 | `package version retrieve` references a `DownloadPackageVersionZips` user permission; `package push-upgrade schedule` docs reference "Create and Update Second-Generation Packages". Neither is needed for the read-only commands in v1; **do not hardcode permission names as gates for listing** — probes (§5) are the source of truth. | Plugin messages. |
 | F23 | The CLI's own docs warn that a user-installed `@salesforce/plugin-packaging` overrides the bundled one and stops following CLI updates. → Detect overrides (§5.2). | Plugin README. |
+| F24 | `package1 version list --package-id` accepts **only 18-character** 033 IDs (`Flags.salesforceId({ length: 18, startsWith: '033' })`; error "The id must be 18 characters."). `package1 version display --package-version-id` (04t) and `package1 version create get --request-id` (0HD) accept 15 or 18. This is **not** visible in `sf commands --json`, so the manifest cannot catch it. | Installed plugin source (`lib/commands/package1/version/{list,display,create/get}.js`); plugin NUT `versionList.nut.ts`. |
+| F25 | `org list --json` always strips `refreshToken` and `clientSecret`, but **replaces** `accessToken` (and `password` when present) with the text `"[REDACTED] Use 'sf org auth show-…' to view"`. If the env var **`SF_TEMP_SHOW_SECRETS=true`** is set, the **real** access token and password are returned. In plugin-org 6.0.11 the JSON always carries a warning about this (6.0.18+ only warns when the env var is set) — never use the warning as a signal. | plugin-org 6.0.11 `src/shared/orgListUtil.ts`, `src/commands/org/list.ts`. |
+| F26 | `org list` groups: `devHubs`, `sandboxes`, `other` are **subsets of `nonScratchOrgs`** (same objects appear twice) → de-duplicate by `username`. `defaultMarker` is `"(D)"`, `"(U)"` or `"(D),(U)"`. `connectedStatus` is `"Connected"` for a healthy org and is **absent** with `--skip-connection-status`. `isDevHub` is checked live only for connected orgs; with `--skip-connection-status` it relies on cached auth data (can miss hubs). Expired/deleted scratch orgs are hidden without `--all`. | plugin-org 6.0.11 source + NUT `listAndDisplay.nut.ts`; schema `schemas/org-list.json` (field list). |
+| F27 | `package version list` row details (JSON mode): `CreatedBy` is the **user Id** (`005…`), not a name. `CodeCoverage` is the literal `"use --verbose for code coverage"` without `--verbose`; with it `"<n>%"`, `"N/A"` (org-dependent or validation skipped) or `""`. `HasPassedCodeCoverageCheck` is a **bool or `"N/A"`**. `AncestorId`/`AncestorVersion` are `"N/A"` for unlocked packages and **absent** for a managed version without ancestor. `IsOrgDependent` is `"N/A"` for managed. `HasMetadataRemoved` is `"N/A"` for unlocked. `HasVpi` is the string `"true"`/`"false"`/`"N/A"`, or absent (needs `--verbose` and API ≥ 67). `Language` absent without `--verbose`. `--concise` only changes table columns, not JSON. Empty result: `result: []` + warning `"No results found"`, exit 0. | Installed `lib/commands/package/version/list.js` (identical in 3.0.6 and 3.0.8 source); NUT `packageVersion.nut.ts` asserts the exact key sets. |
+| F28 | `package list` JSON keys: `Id, SubscriberPackageId, Name, Description, NamespacePrefix, ContainerOptions, ConvertedFromPackageId, PackageErrorUsername, Alias, AppAnalyticsEnabled, CreatedBy, IsOrgDependent`; `AppAnalyticsEnabled` absent below API 59. | NUT `packageList.nut.ts`. |
+| F29 | `package version create list` keys: `Id, Status, Package2Id, Package2Name, Package2VersionId, SubscriberPackageVersionId, Tag, Branch, Error, CreatedDate, HasMetadataRemoved, HasPassedCodeCoverageCheck, CreatedBy, ConvertedFromVersionId, CodeCoverage, VersionNumber`; `--verbose` adds `VersionName`. `create report` returns an **array** with the same keys plus `TotalNumberOfMetadataFiles`, `TotalSizeOfMetadataFiles`. | NUT `packageVersion.nut.ts`; schemas `package-version-create-{list,report}.json`. |
+| F30 | `displayancestry --json` (no `--dot-code`): `{ data, children[] }` recursively; `data` has **only** `SubscriberPackageVersionId, MajorVersion, MinorVersion, PatchVersion, BuildNumber, depthCounter` (the schema also lists `AncestorId`, but real output omits it). With `--dot-code` the result is a string starting `strict graph G {`; `displaydependencies` returns a string starting `strict digraph G {`. | NUT `packageVersion.nut.ts`; unit test `displayDependencies.test.ts`. |
+| F31 | `sf plugins --json` `type` values: `core`, `user` (`plugins install`), `link` (`plugins link`), `dev`, `jit`. User plugins load **before** core ones and a same-named later plugin is skipped, so an override of `@salesforce/plugin-packaging` appears as a single entry with `type: "user"` (or `"link"`). | Installed `@oclif/plugin-plugins` 5.5.1 `lib/commands/plugins/index.js`; `@oclif/core` `lib/config/plugin-loader.js`. |
+| F32 | The CLI finds `sfdx-project.json` by searching the cwd and **every parent directory** up to the filesystem root. | Installed `@salesforce/core` `lib/util/internal.js` (`traverse.forFile`). |
+| F33 | `package1 version list`/`display` JSON: `BuildNumber` is a **number**; other fields strings. Empty result: exit 0, `result: []`, warning `"No Results Found"` (list) / `"No results found"` (display). The 1GP query (`MetadataPackageVersion`, Tooling) has **no** client-side error mapping (F20 does not apply to 1GP). | Installed `@salesforce/packaging` 5.0.7 `lib/package1/package1Version.js`; plugin NUTs. |
+| F34 | `package1 version create get --json` returns the `PackageUploadRequest` record, which can contain **`Password`** (the 1GP installation key). `Status` is `QUEUED`/`IN_PROGRESS`/`SUCCESS`/`ERROR`; on `ERROR` the command **fails** (`uploadFailure`) instead of returning the record. | Installed `lib/commands/package1/version/create/get.js`; schema `package1-version-create-get.json`. |
+| F35 | `@salesforce/plugin-packaging` 3.0.6 ships **JSON Schemas** for every command result in `schemas/` (inside the installed CLI). They describe types, not runtime behaviour, and can be wrong in details (F30). | Installed package. |
 
 ### 4.4 Command manifest (allow-list)
 
-`*` = required. IDs: `0Ho` package, `04t` subscriber package version, `08c` version-create request, `033` 1GP metadata package, `0HD` 1GP upload request. ID rule (CLI `validateId`): length 15 or 18 and correct prefix.
+`*` = required. IDs: `0Ho` package, `04t` subscriber package version, `08c` version-create request, `033` 1GP metadata package, `0HD` 1GP upload request. ID rule (CLI `validateId`): length 15 or 18 and correct prefix. **Exception:** `package1 version list --package-id` requires exactly 18 characters (F24).
 
 **Runnable (read-only) — implement as `ReadOnlyCommand` variants:**
 
@@ -158,13 +170,19 @@ The committed file `manifest/sf-2.150.6.json` is **generated** from `sf commands
 
 Use lenient serde: `#[serde(default)]`, `Option<T>`, **no `deny_unknown_fields`**, and tolerate number-or-string fields (e.g. `BuildDurationInSeconds` is a number or `""`).
 
+Exact key sets and value rules per command are in F27–F30 and F33–F34; the lists below are the union of fields.
+
 **`PackageRow`** (`package list`): `Id` (0Ho), `SubscriberPackageId` (033), `Name`, `Description`, `NamespacePrefix`, `ContainerOptions` (`Managed`|`Unlocked`), `ConvertedFromPackageId`, `Alias` (always `""`, F12), `IsOrgDependent` (`Yes`|`No`|`N/A`), `PackageErrorUsername`, `AppAnalyticsEnabled`, `CreatedBy`.
 
-**`PackageVersionRow`** (`package version list`): `Package2Id`, `Branch`, `Tag`, `MajorVersion`, `MinorVersion`, `PatchVersion`, `BuildNumber`, `Id` (Package2Version id), `SubscriberPackageVersionId` (04t), `ConvertedFromVersionId`, `Name`, `NamespacePrefix`, `Package2Name`, `Description`, `Version` (`M.m.p.b`), `IsPasswordProtected` (bool), `IsReleased` (bool), `CreatedDate`, `LastModifiedDate` (`YYYY-MM-DD HH:mm`), `InstallUrl`, `CodeCoverage` (string; meaningful only with `--verbose`), `HasPassedCodeCoverageCheck`, `ValidationSkipped`, `ValidatedAsync`, `AncestorId`, `AncestorVersion`, `Alias` (CSV; blank outside a project, F13), `IsOrgDependent` (`Yes`|`No`|`N/A` — `N/A` for managed), `ReleaseVersion`, `BuildDurationInSeconds`, `HasMetadataRemoved` (`Yes`|`No`|`N/A`), `CreatedBy`, `Language`, `HasVpi`.
+**`PackageVersionRow`** (`package version list`): `Package2Id`, `Branch`, `Tag`, `MajorVersion`, `MinorVersion`, `PatchVersion`, `BuildNumber`, `Id` (Package2Version id), `SubscriberPackageVersionId` (04t), `ConvertedFromVersionId`, `Name`, `NamespacePrefix`, `Package2Name`, `Description`, `Version` (`M.m.p.b`), `IsPasswordProtected` (bool), `IsReleased` (bool), `CreatedDate`, `LastModifiedDate` (`YYYY-MM-DD HH:mm`), `InstallUrl`, `CodeCoverage` (string; meaningful only with `--verbose`), `HasPassedCodeCoverageCheck`, `ValidationSkipped`, `ValidatedAsync`, `AncestorId`, `AncestorVersion`, `Alias` (CSV; blank outside a project, F13), `IsOrgDependent` (`Yes`|`No`|`N/A` — `N/A` for managed), `ReleaseVersion`, `BuildDurationInSeconds`, `HasMetadataRemoved` (`Yes`|`No`|`N/A`), `CreatedBy` (user Id `005…`, F27), `Language`, `HasVpi` (`"true"`|`"false"`|`"N/A"`|absent). Mixed types: `HasPassedCodeCoverageCheck` (bool or `"N/A"`), `BuildDurationInSeconds` (number or `""`). Absent keys: `AncestorId`/`AncestorVersion` (managed without ancestor), `Language`/`HasVpi`/`HasPassedCodeCoverageCheck` (without `--verbose`).
 
 **`InstalledPackageRow`** (`package installed list`): `Id`, `SubscriberPackageId`, `SubscriberPackageName`, `SubscriberPackageNamespace`, `VersionSettings` (`namespace`|`packageId`|`""`), `SubscriberPackageVersionId`, `SubscriberPackageVersionName`, `SubscriberPackageVersionNumber`.
 
-**`Package1VersionRow`** (`package1 version list` / `display`): `MetadataPackageVersionId` (04t), `MetadataPackageId` (033), `Name`, `ReleaseState`, `Version` (`major.minor.patch`), `BuildNumber`.
+**`Package1VersionRow`** (`package1 version list` / `display`): `MetadataPackageVersionId` (04t), `MetadataPackageId` (033), `Name`, `ReleaseState`, `Version` (`major.minor.patch`), `BuildNumber` (number, F33).
+
+**`OrgRow`** (`org list`, F25–F26): all optional except `username`, `orgId`, `instanceUrl`; notable: `alias`, `isDevHub`, `isSandbox`, `isScratch`, `connectedStatus`, `isDefaultUsername`, `isDefaultDevHubUsername`, `defaultMarker`, `lastUsed`, `instanceApiVersion`, `namespacePrefix`, `orgEdition`, `name`; scratch orgs add `expirationDate`, `isExpired`, `devHubUsername`, `status`, `namespace`, `orgName`. Never deserialize `accessToken`, `password`, `refreshToken`, `clientSecret` into the model (§10).
+
+**`PackageAncestryNode`** (F30), **`CreateRequestRow`** (F29): see facts.
 
 **Envelope types:** `SfSuccess<T> { status: 0, result: T, warnings: Vec<String> }`, `SfError { name, message, exitCode, status, code?, context?, commandName?, warnings, actions? }`. Parse stdout JSON **even when the exit code is non-zero**; treat stderr as diagnostics only. `plugins` output is a bare array (F3) — give it its own parser.
 
@@ -176,17 +194,17 @@ Use lenient serde: `#[serde(default)]`, `Option<T>`, **no `deny_unknown_fields`*
 
 ### 4.7 Known unknowns — capture a real fixture before relying on any of these
 
-| ID | Unknown | Action |
-|----|---------|--------|
-| U1 | Field list of each org object in `org list --json` (alias, username, orgId, instanceUrl, `isDevHub`, `connectedStatus`, default markers…). | Capture with a real login; model as optional fields. |
-| U2 | JSON keys of `package version report --json` (result is "massaged"). | Capture with `--verbose` and without. |
-| U3 | JSON keys of `package version create list --json` / `create report --json` (table labels differ from raw field names). | Capture. |
-| U4 | JSON shape of `displayancestry` without `--dot-code`. | Capture for a managed 2GP package and a version. |
-| U5 | Exact `name`/`code` values for: expired session, insufficient access, API disabled, network failure. | Provoke each (revoked token, restricted profile, offline) and record. Until captured, classify by substring (§5.3) and fall back to `Unknown` with the raw message. |
-| U6 | Whether `sf plugins --json` reports `type` values `user`/`link` for non-core installs. | Install a throwaway user plugin and record. |
-| U7 | Behaviour of `package1 version list` in a non-packaging org and in a subscriber org (empty vs error). | Capture both. |
-| U8 | Sandbox install-link host convention (`test.salesforce.com`) — F18 only proves the production host. | Verify against a sandbox before shipping the "sandbox link" button; otherwise label it "constructed". |
-| U9 | Whether the CLI locates `sfdx-project.json` by walking up parent directories (relevant to alias resolution UI). | Test from a nested directory. |
+| ID | Unknown | Status (2026-10-03) | Action |
+|----|---------|--------|--------|
+| U1 | Field list of each org object in `org list --json`. | 🟡 Shape known (F25, F26). | One real capture to confirm which fields are actually present. |
+| U2 | JSON keys of `package version report --json`. | 🟢 Resolved from schema + unit tests (F35). | Real capture optional. |
+| U3 | JSON keys of `create list` / `create report`. | 🟢 Resolved (F29). | — |
+| U4 | JSON shape of `displayancestry` without `--dot-code`. | 🟢 Resolved (F30). | — |
+| U5 | Exact `name`/`code` for: not a Dev Hub, expired session, insufficient access, API disabled, network failure. | 🔴 Open — produced by the server/network, not the plugin. | Capture (docs/FIXTURE_CAPTURE.md). Until then classify by substring (§5.3) and fall back to `Unknown` with the raw message. |
+| U6 | `sf plugins --json` `type` values for non-core installs. | 🟢 Resolved (F31). | — |
+| U7 | `package1 version list` in a subscriber / non-packaging org. | 🔴 Open, narrowed (F33): either `[]` + warning, or a raw server error (e.g. `INVALID_TYPE`). | Capture; handle both outcomes meanwhile. |
+| U8 | Sandbox install-link host (`test.salesforce.com`). | 🔴 Open. | Verify in a sandbox; otherwise label the sandbox link "constructed". |
+| U9 | Does the CLI find `sfdx-project.json` in parent directories? | 🟢 Resolved: yes, up to the filesystem root (F32). | — |
 
 ---
 
@@ -332,7 +350,7 @@ impl SfRunner {
 ### 7.3 Runner behaviour
 
 - `Command::new(bin).args(argv)`, stdin = null, stdout/stderr piped, working dir = project dir **only** when the user chose alias mode for a run, else the app's own cwd.
-- Environment: pass through the user's environment; additionally set `NO_COLOR=1`, `SF_SKIP_NEW_VERSION_CHECK=true`, `SF_AUTOUPDATE_DISABLE=true`. Do **not** alter telemetry settings. Do not rely on env for correctness — parse stdout JSON only.
+- Environment: pass through the user's environment; additionally set `NO_COLOR=1`, `SF_SKIP_NEW_VERSION_CHECK=true`, `SF_AUTOUPDATE_DISABLE=true`, and **always remove `SF_TEMP_SHOW_SECRETS`** from the child environment (F25). Do **not** alter telemetry settings. Do not rely on env for correctness — parse stdout JSON only.
 - Optional setting "Max rows" → `SF_ORG_MAX_QUERY_LIMIT` (F10) for that process only.
 - Concurrency semaphore = 3. Timeout 120 s default. Cancellation kills the child. Output cap 64 MB.
 - Windows: resolve `sf.cmd` via `which`; because argv values are validated against strict patterns (§9.2), no value can contain shell metacharacters even when a `.cmd` shim is used.
@@ -397,7 +415,7 @@ Top bar: **CLI pill** (✅ 2.150.6 / ⛔ mismatch), **Dev Hub selector**, **Pack
 ## 10. Security & privacy
 
 - No telemetry. No network I/O by the app itself.
-- Never run `org display` (it can emit access tokens). `org list` hides secrets in 2.150.6 (F8), but the app must still scrub any field named like `accessToken`, `refreshToken`, `sfdxAuthUrl`, `clientSecret` if present.
+- Never run `org display` (it can emit access tokens). `org list` hides secrets in 2.150.6 (F8), but the app must still scrub any field named like `accessToken`, `password`, `Password`, `refreshToken`, `sfdxAuthUrl`, `clientSecret`, `privateKey` from every result, whatever its value (F25, F34). The runner removes `SF_TEMP_SHOW_SECRETS` from the child environment (§7.3).
 - Installation keys: masked input, memory only, excluded from History/logs/diagnostics.
 - Logs (`tracing`): argv of runnable commands is safe (validated, secret-free) and may be logged; stdout is **not** logged by default.
 - **Copy diagnostics** redacts usernames, org IDs, instance URLs by default (checkbox to include).
