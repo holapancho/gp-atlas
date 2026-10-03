@@ -10,7 +10,7 @@
     },
     {
       "argv": ["org", "list", "--json"],
-      "stdout": "org-list.empty.json"
+      "stdout": "org-list.real.json"
     },
     {
       "argv": ["alias", "list", "--json"],

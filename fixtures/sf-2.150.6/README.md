@@ -8,6 +8,7 @@ fixture files for `tests/fake-sf`.
 | `version.json` | `sf version --json` | 0 |
 | `plugins.json` | `sf plugins --json` (**trimmed**, see below) | 0 |
 | `org-list.empty.json` | `sf org list --json` (no authenticated orgs) | 0 |
+| `org-list.real.json` | `sf org list --json` on a developer machine with 48 orgs (3 Dev Hubs, 4 sandboxes, 34 other, 7 scratch); captured by the project owner on darwin-arm64, Node 24.19.0, 2026-10 | 0 |
 | `alias-list.empty.json` | `sf alias list --json` (no aliases) | 0 |
 | `package-list.named-org-not-found.json` | `sf package list -v nobody@example.com --json` | 2 |
 | `package1-version-list.named-org-not-found.json` | `sf package1 version list -o nobody@example.com --json` | 2 |
@@ -16,6 +17,8 @@ Capture environment: 2026-10-01, linux-x64, Node 22.22.0, clean
 `npm install @salesforce/cli@2.150.6`, no authenticated orgs.
 
 Sanitization:
+
+- `org-list.real.json`: usernames, org IDs, instance/login URLs, names, aliases, namespaces and client IDs were replaced with fakes by the project owner before upload. Additionally, the 7 `ScratchOrgInfo` record IDs in `attributes.url` were replaced with `2SR000000000000001`…, and every `accessToken` was set to the CLI's own constant redaction text (`[REDACTED] Use 'sf org auth show-access-token' to view`, plugin-org 6.0.11), which is what the CLI prints when `SF_TEMP_SHOW_SECRETS` is unset.
 
 - Local install paths in stack traces were replaced with `/opt/sf`.
 - `plugins.json`: the real output is about 3.4 MB because each entry embeds
@@ -26,6 +29,4 @@ Sanitization:
   `--target-org`), the only form GP Atlas emits. The output does not depend
   on the spelling.
 
-Fixtures that need real orgs (Dev Hub, packaging org, sandbox; SPEC §4.7
-U1–U9 and Appendix B) are still to be captured with `tools/capture-fixtures`
-(milestone M7).
+The remaining real-org captures are listed in `docs/FIXTURE_CAPTURE.md`.

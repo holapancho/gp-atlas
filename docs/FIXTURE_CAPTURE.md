@@ -37,13 +37,13 @@ $SUB = "my-subscriber-org"
 
 ---
 
-## The 8 captures
+## The 8 captures (1 done, 7 to go)
 
-Easiest first: 1–4 need only your Dev Hub and one ordinary org.
+Easiest first: 2–4 need only your Dev Hub and one ordinary org.
 
 | ✔ | # | Resolves | How |
 |---|---|---|---|
-| ☐ | 1 | U1 `org list` fields | `cap 01-org-list org list` |
+| ✅ | 1 | U1 `org list` fields | Received — `fixtures/sf-2.150.6/org-list.real.json` |
 | ☐ | 2 | U7 1GP in a subscriber org | `cap 33-pkg1-list-subscriber package1 version list --target-org "$SUB"` |
 | ☐ | 3 | U5 org is not a Dev Hub | `cap 50-pkglist-not-devhub package list --target-dev-hub "$SUB"` |
 | ☐ | 4 | U5 offline | Turn Wi-Fi/VPN off, then `cap 51-offline package list --target-dev-hub "$HUB"` |
@@ -51,8 +51,6 @@ Easiest first: 1–4 need only your Dev Hub and one ordinary org.
 | ☐ | 6 | U5 insufficient access | Log in as a user on a minimal profile, then `cap 53-restricted package version list --target-dev-hub <that alias>` |
 | ☐ | 7 | U5 API disabled | Log in as a user whose profile lacks "API Enabled", then `cap 55-api-disabled package list --target-dev-hub <that alias>` |
 | ☐ | 8 | U8 sandbox install link | No command: in a sandbox, open `https://test.salesforce.com/packaging/installPackage.apexp?p0=<04t>` and report whether the install page loads |
-
-Best if your org list (1) includes a Dev Hub, a sandbox and a scratch org.
 
 ---
 

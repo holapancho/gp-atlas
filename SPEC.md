@@ -131,6 +131,7 @@ Binary resolution order: `GP_ATLAS_SF_BIN` env var → setting in app config →
 | F33 | `package1 version list`/`display` JSON: `BuildNumber` is a **number**; other fields strings. Empty result: exit 0, `result: []`, warning `"No Results Found"` (list) / `"No results found"` (display). The 1GP query (`MetadataPackageVersion`, Tooling) has **no** client-side error mapping (F20 does not apply to 1GP). | Installed `@salesforce/packaging` 5.0.7 `lib/package1/package1Version.js`; plugin NUTs. |
 | F34 | `package1 version create get --json` returns the `PackageUploadRequest` record, which can contain **`Password`** (the 1GP installation key). `Status` is `QUEUED`/`IN_PROGRESS`/`SUCCESS`/`ERROR`; on `ERROR` the command **fails** (`uploadFailure`) instead of returning the record. | Installed `lib/commands/package1/version/create/get.js`; schema `package1-version-create-get.json`. |
 | F35 | `@salesforce/plugin-packaging` 3.0.6 ships **JSON Schemas** for every command result in `schemas/` (inside the installed CLI). They describe types, not runtime behaviour, and can be wrong in details (F30). | Installed package. |
+| F36 | Real `org list --json` (48 orgs): every org object has `username, accessToken (redacted text), instanceUrl, orgId, loginUrl, clientId, instanceApiVersion, instanceApiVersionLastRetrieved (locale string, e.g. "9/30/2026, 4:08:45 PM"), isDevHub, namespacePrefix (string or null), name, instanceName, isSandbox, isScratch, trailExpirationDate (ISO "…+0000" or null), orgEdition, alias (may be null), isDefaultDevHubUsername, isDefaultUsername, lastUsed (ISO)`; `tracksSource` is sometimes absent. Non-scratch orgs add `connectedStatus` and (only when default) `defaultMarker`. **`connectedStatus` is free text**: `"Connected"` or an error message, observed: `"Session expired or invalid"`, `"Unable to refresh session due to: Error authenticating with the refresh token due to: authentication failure"`, and a multi-line HTML/HTTP 420 error. Scratch orgs have **no** `connectedStatus`; they add `devHubUsername, created (epoch ms as a string), expirationDate ("YYYY-MM-DD"), createdOrgInstance, signupUsername, createdBy (a username), createdDate (ISO), devHubOrgId, devHubId, attributes, orgName, edition, status ("Active"), isExpired, namespace`. `loginUrl` may or may not have a trailing `/`. | Owner's capture `fixtures/sf-2.150.6/org-list.real.json`. |
 
 ### 4.4 Command manifest (allow-list)
 
@@ -196,11 +197,11 @@ Exact key sets and value rules per command are in F27–F30 and F33–F34; the l
 
 | ID | Unknown | Status (2026-10-03) | Action |
 |----|---------|--------|--------|
-| U1 | Field list of each org object in `org list --json`. | 🟡 Shape known (F25, F26). | One real capture to confirm which fields are actually present. |
+| U1 | Field list of each org object in `org list --json`. | 🟢 Resolved by a real capture (F36). | — |
 | U2 | JSON keys of `package version report --json`. | 🟢 Resolved from schema + unit tests (F35). | Real capture optional. |
 | U3 | JSON keys of `create list` / `create report`. | 🟢 Resolved (F29). | — |
 | U4 | JSON shape of `displayancestry` without `--dot-code`. | 🟢 Resolved (F30). | — |
-| U5 | Exact `name`/`code` for: not a Dev Hub, expired session, insufficient access, API disabled, network failure. | 🔴 Open — produced by the server/network, not the plugin. | Capture (docs/FIXTURE_CAPTURE.md). Until then classify by substring (§5.3) and fall back to `Unknown` with the raw message. |
+| U5 | Exact `name`/`code` for: not a Dev Hub, expired session, insufficient access, API disabled, network failure. | 🔴 Open — produced by the server/network, not the plugin. `org list` already shows the **text** of expired/refresh-failure sessions (F36), not the error envelope of a failing command. | Capture (docs/FIXTURE_CAPTURE.md). Until then classify by substring (§5.3) and fall back to `Unknown` with the raw message. |
 | U6 | `sf plugins --json` `type` values for non-core installs. | 🟢 Resolved (F31). | — |
 | U7 | `package1 version list` in a subscriber / non-packaging org. | 🔴 Open, narrowed (F33): either `[]` + warning, or a raw server error (e.g. `INVALID_TYPE`). | Capture; handle both outcomes meanwhile. |
 | U8 | Sandbox install-link host (`test.salesforce.com`). | 🔴 Open. | Verify in a sandbox; otherwise label the sandbox link "constructed". |
