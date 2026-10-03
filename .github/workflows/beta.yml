@@ -1,0 +1,57 @@
+name: Beta binaries
+
+# Builds the `gp-atlas-beta` debug CLI for manual testing.
+# Download from the run's "Artifacts" section.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: gp-atlas-beta (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            os: macos-latest
+            exe: gp-atlas-beta
+          - name: linux-x64
+            os: ubuntu-latest
+            exe: gp-atlas-beta
+          - name: windows-x64
+            os: windows-latest
+            exe: gp-atlas-beta.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked --release -p gp-atlas-cli
+      - name: Package
+        shell: bash
+        run: |
+          mkdir dist
+          cp "target/release/${{ matrix.exe }}" dist/
+          cp docs/BETA.md LICENSE dist/
+          # Zip keeps the executable bit (upload-artifact alone does not).
+          cd dist
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a "../gp-atlas-beta-${{ matrix.name }}.zip" . > /dev/null
+          else
+            zip -q "../gp-atlas-beta-${{ matrix.name }}.zip" ./*
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-atlas-beta-${{ matrix.name }}
+          path: gp-atlas-beta-${{ matrix.name }}.zip
+          retention-days: 30

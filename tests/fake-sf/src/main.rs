@@ -14,7 +14,8 @@
 //! Index format:
 //! ```json
 //! { "cases": [ { "argv": ["version", "--json"], "stdout": "version.json",
-//!                "stderr": "optional inline text", "exit_code": 0, "delay_ms": 0 } ] }
+//!                "stderr": "optional inline text", "exit_code": 0, "delay_ms": 0,
+//!                "env_report": ["NAME"] } ] }
 //! ```
 //! An argv with no matching case prints a message on stderr and exits with
 //! [`NO_FIXTURE_EXIT_CODE`].
@@ -47,6 +48,10 @@ struct Case {
     exit_code: u8,
     #[serde(default)]
     delay_ms: u64,
+    /// Instead of a fixture, print `{"env": {NAME: value|null}}` for these
+    /// variables (lets tests check what the runner passes to the child).
+    #[serde(default)]
+    env_report: Vec<String>,
 }
 
 fn default_index() -> PathBuf {
@@ -98,6 +103,19 @@ fn main() -> ExitCode {
         std::thread::sleep(Duration::from_millis(case.delay_ms));
     }
 
+    if !case.env_report.is_empty() {
+        let env: serde_json::Map<String, serde_json::Value> = case
+            .env_report
+            .iter()
+            .map(|k| {
+                (
+                    k.clone(),
+                    std::env::var(k).map(Into::into).unwrap_or_default(),
+                )
+            })
+            .collect();
+        println!("{}", serde_json::json!({ "env": env }));
+    }
     if let Some(file) = &case.stdout {
         let dir = index_path.parent().unwrap_or(Path::new("."));
         match std::fs::read(dir.join(file)) {

@@ -1,12 +1,20 @@
 //! UI-free core of GP Atlas.
 //!
-//! M0 provides the pinned CLI contract: the supported `sf` version, the
-//! command manifest generated from `sf commands --json`, and the blocklist of
-//! commands GP Atlas must never run. The runner, parsers and probes follow in
-//! later milestones (see `SPEC.md` §12).
+//! Contains the pinned CLI contract (manifest, blocklist), validated inputs,
+//! the closed `ReadOnlyCommand` set, the runner, JSON parsing and scrubbing,
+//! error classification, Doctor checks, org inventory and capability probes.
 
 pub mod blocklist;
+pub mod classify;
+pub mod command;
+pub mod doctor;
+pub mod envelope;
+pub mod ids;
 pub mod manifest;
+pub mod orgs;
+pub mod probes;
+pub mod runner;
+pub mod versions;
 
 /// The only Salesforce CLI version GP Atlas supports (SPEC §4.2).
 pub const REQUIRED_CLI_VERSION: &str = "2.150.6";

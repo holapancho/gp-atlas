@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/gp-atlas-core",
     "crates/gp-atlas-egui",
+    "crates/gp-atlas-cli",
     "tools/extract-manifest",
     "tests/fake-sf",
     "tests/contract",

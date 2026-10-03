@@ -1,0 +1,22 @@
+[package]
+name = "gp-atlas-cli"
+description = "GP Atlas beta: command-line debug frontend and fixture capture."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "gp-atlas-beta"
+path = "src/main.rs"
+
+[dependencies]
+gp-atlas-core.workspace = true
+clap = { version = "4", features = ["derive", "env"] }
+regex = "1"
+serde_json.workspace = true
+
+[lints]
+workspace = true
