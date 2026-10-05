@@ -1,0 +1,23 @@
+[package]
+name = "gp-atlas-tui"
+description = "GP Atlas terminal UI (ratatui): clickable, keyboard-driven, read-only."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "gp-atlas-tui"
+path = "src/main.rs"
+
+[dependencies]
+gp-atlas-core.workspace = true
+serde_json.workspace = true
+ratatui = "0.30"
+arboard = { version = "3", default-features = false }
+clap = { version = "4", features = ["derive", "env"] }
+
+[lints]
+workspace = true

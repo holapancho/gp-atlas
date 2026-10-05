@@ -1,4 +1,37 @@
-# GP Atlas beta (`gp-atlas-beta`)
+# GP Atlas beta
+
+Two programs, both read-only and built on the same core:
+
+| Program | What it is |
+|---|---|
+| **`gp-atlas-tui`** | The **clickable terminal UI**: tabs, tables, popups. Use this day to day. |
+| `gp-atlas-beta` | Command-line debug tool: one command per action, `--debug`, and `capture` for fixtures. |
+
+## Terminal UI (`gp-atlas-tui`)
+
+```bash
+./target/debug/gp-atlas-tui            # if you built it yourself (see below)
+./gp-atlas-tui                         # if you downloaded it
+```
+
+It opens full-screen in your terminal. Click a tab or a row (click the selected
+row again to open it), scroll with the wheel, or use the keyboard; `?` shows
+all keys, `q` quits.
+
+1. **Doctor** checks `sf` (≥ 2.150.6), then the app jumps to **Orgs**.
+2. **Orgs**: your default Dev Hub and org are preselected. Select a row and
+   press `h` (use as Dev Hub) or `o` (use as target org).
+3. **Access**: `a` probes all orgs (`p` just the selected one) and shows what
+   each org lets you read; `Enter` on a cell explains the result.
+4. **2GP Packages** → `Enter` on a package → **2GP Versions** (`R` released,
+   `L` latest per package, `V` verbose, `c` copy 04t, `i` copy install link,
+   `Enter` version details).
+5. **Installed** and **1GP Versions** use the selected org.
+6. **History** lists every `sf` call with exit code, time and stderr.
+
+`--no-mouse` turns off mouse capture so you can select text normally.
+
+## Command-line debug tool (`gp-atlas-beta`)
 
 A command-line **debug build** of GP Atlas. It runs on the same core the desktop
 app will use: the version gate, the read-only command set, the runner,
@@ -29,9 +62,9 @@ On macOS the download is quarantined because the binary is not signed yet:
 
 ```bash
 cd ~/Downloads/gp-atlas-beta-macos-arm64     # wherever you unzipped it
-xattr -d com.apple.quarantine gp-atlas-beta
-chmod +x gp-atlas-beta
-./gp-atlas-beta --help
+xattr -d com.apple.quarantine gp-atlas-tui gp-atlas-beta
+chmod +x gp-atlas-tui gp-atlas-beta
+./gp-atlas-tui
 ```
 
 **From source:** see [Build a debug version on another machine](#build-a-debug-version-on-another-machine).
@@ -57,17 +90,18 @@ Plus `git`, Node.js ≥ 22 and `sf` ≥ 2.150.6 (`npm install --global @salesfor
 git clone https://github.com/holapancho/gp-atlas
 cd gp-atlas
 rustup toolchain install          # installs the pinned Rust (rust-toolchain.toml)
-cargo build -p gp-atlas-cli       # debug build (default profile)
+cargo build -p gp-atlas-tui -p gp-atlas-cli   # debug build (default profile)
 ```
 
-The binary is `target/debug/gp-atlas-beta` (`target\debug\gp-atlas-beta.exe`
-on Windows). If the repository is private, clone with an account that has
+The programs are `target/debug/gp-atlas-tui` and `target/debug/gp-atlas-beta`
+(`.exe` on Windows). If the repository is private, clone with an account that has
 access (`gh auth login`, or an SSH key).
 
 **3. Run with debugging on**
 
 ```bash
 # macOS / Linux
+RUST_BACKTRACE=1 ./target/debug/gp-atlas-tui          # clickable UI; History tab shows every sf call
 RUST_BACKTRACE=1 ./target/debug/gp-atlas-beta --debug doctor
 # or build-and-run in one step
 RUST_BACKTRACE=1 cargo run -p gp-atlas-cli -- --debug orgs
@@ -88,7 +122,7 @@ $env:RUST_BACKTRACE = "1"
 **4. Update later**
 
 ```bash
-git pull && cargo build -p gp-atlas-cli
+git pull && cargo build -p gp-atlas-tui -p gp-atlas-cli
 ```
 
 **5. Optional: run the test suite on that machine**
@@ -99,8 +133,9 @@ cargo test -p gp-atlas-contract-tests -- --ignored    # needs sf 2.150.6 exactly
 GP_ATLAS_CONTRACT_MODE=compat cargo test -p gp-atlas-contract-tests -- --ignored   # any newer sf
 ```
 
-A release (optimized) build is `cargo build --release -p gp-atlas-cli`
-→ `target/release/gp-atlas-beta`.
+A release (optimized) build is `cargo build --release -p gp-atlas-tui -p gp-atlas-cli`
+→ `target/release/`. To run them from any folder:
+`cargo install --path crates/gp-atlas-tui` and `cargo install --path crates/gp-atlas-cli`.
 
 ## Commands
 

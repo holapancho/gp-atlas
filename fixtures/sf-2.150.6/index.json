@@ -13,6 +13,10 @@
       "stdout": "org-list.real.json"
     },
     {
+      "argv": ["org", "list", "--skip-connection-status", "--json"],
+      "stdout": "org-list-skip.derived.json"
+    },
+    {
       "argv": ["alias", "list", "--json"],
       "stdout": "alias-list.empty.json"
     },

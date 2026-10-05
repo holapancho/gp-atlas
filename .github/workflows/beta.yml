@@ -1,6 +1,7 @@
 name: Beta binaries
 
-# Builds the `gp-atlas-beta` debug CLI for manual testing.
+# Builds the beta binaries for manual testing: `gp-atlas-tui` (clickable
+# terminal UI) and `gp-atlas-beta` (command-line debug tool + fixture capture).
 # Download from the run's "Artifacts" section.
 
 on:
@@ -16,32 +17,32 @@ env:
 
 jobs:
   build:
-    name: gp-atlas-beta (${{ matrix.name }})
+    name: gp-atlas beta binaries (${{ matrix.name }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: macos-arm64
             os: macos-latest
-            exe: gp-atlas-beta
+            ext: ""
           - name: linux-x64
             os: ubuntu-latest
-            exe: gp-atlas-beta
+            ext: ""
           - name: windows-x64
             os: windows-latest
-            exe: gp-atlas-beta.exe
+            ext: .exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - name: Install pinned toolchain (rust-toolchain.toml)
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --locked --release -p gp-atlas-cli
+      - run: cargo build --locked --release -p gp-atlas-cli -p gp-atlas-tui
       - name: Package
         shell: bash
         run: |
           mkdir dist
-          cp "target/release/${{ matrix.exe }}" dist/
+          cp "target/release/gp-atlas-tui${{ matrix.ext }}" "target/release/gp-atlas-beta${{ matrix.ext }}" dist/
           cp docs/BETA.md LICENSE dist/
           # Zip keeps the executable bit (upload-artifact alone does not).
           cd dist

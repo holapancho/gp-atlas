@@ -4,6 +4,7 @@ members = [
     "crates/gp-atlas-core",
     "crates/gp-atlas-egui",
     "crates/gp-atlas-cli",
+    "crates/gp-atlas-tui",
     "tools/extract-manifest",
     "tests/fake-sf",
     "tests/contract",

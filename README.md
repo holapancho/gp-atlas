@@ -12,8 +12,9 @@ build exact, correctly quoted `sf` commands to copy and run themselves.
 > uses your locally installed Salesforce CLI as its only data source.
 
 **Status:** early development. The desktop UI is not implemented yet; a
-command-line **beta** (`gp-atlas-beta`) runs on the same core: Doctor, org
-inventory, Access Matrix, package/version listings and fixture capture. See
+clickable **terminal UI** (`gp-atlas-tui`) and a command-line debug tool
+(`gp-atlas-beta`) run on the same core: Doctor, org inventory, Access Matrix,
+2GP/1GP/installed package listings, History and fixture capture. See
 [`docs/BETA.md`](docs/BETA.md) to try it, and [`SPEC.md`](SPEC.md) for the
 full specification and milestone plan.
 
@@ -60,6 +61,7 @@ cargo test
 | Path | Purpose |
 |---|---|
 | `crates/gp-atlas-core` | UI-free core: CLI contract, manifest, blocklist, validated inputs, `ReadOnlyCommand`, runner, JSON parsing and secret scrubbing, error classification, Doctor, orgs, probes. |
+| `crates/gp-atlas-tui` | `gp-atlas-tui`: clickable terminal UI (ratatui). |
 | `crates/gp-atlas-cli` | `gp-atlas-beta`: command-line debug frontend and sanitized fixture capture ([docs/BETA.md](docs/BETA.md)). |
 | `crates/gp-atlas-egui` | The `gp-atlas` desktop binary (egui UI, not started yet). |
 | `manifest/sf-2.150.6.json` | **Generated** from `sf commands --json`. Never edit it by hand. |
