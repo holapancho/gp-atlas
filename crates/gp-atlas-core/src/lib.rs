@@ -9,6 +9,7 @@ pub mod classify;
 pub mod command;
 pub mod doctor;
 pub mod envelope;
+pub mod graph;
 pub mod ids;
 pub mod manifest;
 pub mod orgs;

@@ -1,6 +1,8 @@
 # Idea: Ancestry & Dependencies views
 
-Status: **idea / design draft** (2026-10-05). Not built yet.
+Status: **built in `gp-atlas-tui`** (2026-10-05), except the installation-key
+prompt (§3, "Key-protected versions") and the desktop app. See "Implementation
+notes" at the end for what differs from this draft.
 
 Show, for any 2GP package version, **where it comes from** (ancestry) and
 **what it needs** (dependencies), directly in the 2GP tab, read-only, using
@@ -180,3 +182,25 @@ Two views of the same graph, toggled with `t`:
 - Rendering images (PNG/SVG) of the graphs; copying the DOT command is enough.
 - Changing ancestry or dependencies (they are set at build time in
   `sfdx-project.json`, which GP Atlas never edits).
+
+---
+
+## Implementation notes (2026-10-05)
+
+- **Ancestry uses `--dot-code` for the whole package**, not the JSON tree:
+  the JSON keeps only the first root, and for a 04t it returns descendants,
+  not ancestors (SPEC F39). GP Atlas parses the DOT, draws every root, and
+  computes the path from the selected version to its root itself.
+- Keys on the 2GP tab: `a` ancestry (from a version: that version marked and
+  its path to the root highlighted; from the packages pane: whole tree),
+  `A` whole package tree, `d` dependencies of the selected version.
+- Dependencies: install order (default) or tree (`t`), "(direct)" marks the
+  CLI's highlighted direct dependencies, "In org" compares with the selected
+  org's `package installed list` (by 04t, else by package name and numeric
+  version). Unreleased versions get a note with their `AncestorVersion`.
+- Not built yet: the installation-key prompt for key-protected versions
+  (so no key ever reaches argv or History), and real captures U10–U14 —
+  tests use DOT text shaped exactly like the CLI source produces.
+- Code: `gp-atlas-core/src/graph.rs` (DOT parser, forest, path, install
+  order, install state) and `gp-atlas-tui` (`GraphView`, jobs `Ancestry` /
+  `Deps`).

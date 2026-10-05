@@ -28,6 +28,10 @@ all keys, `q` quits.
    shows everything. ←/→ or a click switches pane. Filters: `R` released,
    `L` latest per package, `V` verbose. On a version: `c` copy 04t,
    `i` copy install link, `Enter` details.
+   - `a` **ancestry**: the package's version tree (released versions), with the
+     selected version and its path to the root highlighted. `A` = whole tree.
+   - `d` **dependencies**: what to install first, in install order (`t` for a
+     tree), and whether each one is already in the selected org.
 5. **Installed** and **1GP Versions** use the selected org.
 6. **History** lists every `sf` call with exit code, time and stderr.
 

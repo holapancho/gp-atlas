@@ -8,6 +8,7 @@ use std::time::Instant;
 use gp_atlas_core::classify::CapState;
 use gp_atlas_core::command::{PkgVersionListArgs, ReadOnlyCommand};
 use gp_atlas_core::doctor::DoctorReport;
+use gp_atlas_core::graph::{self as dag, Graph};
 use gp_atlas_core::ids::{Id0Ho, Id04t, PackageRef};
 use gp_atlas_core::manifest::Manifest;
 use gp_atlas_core::orgs::{self, Org};
@@ -21,6 +22,9 @@ use serde_json::Value;
 
 use crate::clip;
 use crate::worker::{Done, Failure, Job, LogEntry, Outcome, Pool, Request};
+
+/// Production install link prefix (F18). Same as the CLI's `InstallUrl`.
+const INSTALL_URL_BASE: &str = "https://login.salesforce.com/packaging/installPackage.apexp?p0=";
 
 /// Max History entries kept (§8).
 const LOG_CAP: usize = 200;
@@ -170,6 +174,89 @@ pub struct VersionFilter {
     pub verbose: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphKind {
+    Ancestry,
+    Deps,
+}
+
+/// The Ancestry / Dependencies overlay on the 2GP tab.
+pub struct GraphView {
+    pub kind: GraphKind,
+    pub title: String,
+    pub loading: Option<(u64, Instant)>,
+    pub graph: Option<Graph>,
+    pub failure: Option<Failure>,
+    /// 04t to highlight (the version the user started from).
+    pub focus: Option<String>,
+    pub notes: Vec<String>,
+    /// Dependencies: false = install order, true = tree.
+    pub tree_mode: bool,
+    pub scroll: Scroll,
+    /// The command behind the view, for "copy command" (copy-only).
+    pub command: Option<ReadOnlyCommand>,
+}
+
+/// One displayed line of a graph view.
+pub struct GraphRow {
+    pub prefix: String,
+    pub id: String,
+    pub label: String,
+    pub focus: bool,
+    pub on_path: bool,
+    pub highlighted: bool,
+    pub children: usize,
+}
+
+impl GraphView {
+    pub fn rows(&self) -> Vec<GraphRow> {
+        let Some(g) = &self.graph else {
+            return vec![];
+        };
+        let path: Vec<String> = self
+            .focus
+            .as_deref()
+            .map(|f| g.path_to_root(f))
+            .unwrap_or_default();
+        let row = |prefix: String, id: &str| {
+            let n = g.node(id);
+            GraphRow {
+                prefix,
+                id: id.to_owned(),
+                label: n.map(|n| n.label.clone()).unwrap_or_else(|| id.to_owned()),
+                focus: self.focus.as_deref() == Some(id),
+                on_path: path.iter().any(|p| p == id),
+                highlighted: n.is_some_and(|n| n.highlighted),
+                children: g.child_count(id),
+            }
+        };
+        match (self.kind, self.tree_mode) {
+            (GraphKind::Ancestry, _) => g
+                .forest(false)
+                .into_iter()
+                .map(|l| row(l.prefix, &l.id))
+                .collect(),
+            (GraphKind::Deps, true) => g
+                .forest(true)
+                .into_iter()
+                .map(|l| row(l.prefix, &l.id))
+                .collect(),
+            (GraphKind::Deps, false) => match g.install_order() {
+                Ok(order) => order
+                    .iter()
+                    .enumerate()
+                    .map(|(i, n)| row(format!("{:>2}. ", i + 1), &n.id))
+                    .collect(),
+                Err(_) => g
+                    .forest(true)
+                    .into_iter()
+                    .map(|l| row(l.prefix, &l.id))
+                    .collect(),
+            },
+        }
+    }
+}
+
 pub struct Popup {
     pub title: String,
     pub lines: Vec<String>,
@@ -187,6 +274,9 @@ pub struct Hits {
     /// Column x-ranges of the Access matrix capability columns.
     pub access_cols: Vec<(u16, u16)>,
     pub popup: Option<Rect>,
+    /// Graph overlay and its rows area.
+    pub graph: Option<Rect>,
+    pub graph_rows: Option<Rect>,
 }
 
 pub struct App {
@@ -221,6 +311,7 @@ pub struct App {
     pub log: Vec<LogEntry>,
     pub log_scroll: Scroll,
     pub popup: Option<Popup>,
+    pub graph: Option<GraphView>,
     pub status: String,
     pub hits: Hits,
     pub allow_cli_version: Option<String>,
@@ -262,6 +353,7 @@ impl App {
             log: Vec::new(),
             log_scroll: Scroll::default(),
             popup: None,
+            graph: None,
             status: "Checking the Salesforce CLI…".into(),
             hits: Hits::default(),
             allow_cli_version,
@@ -370,6 +462,7 @@ impl App {
             (Job::Versions { .. }, o) => finish(&mut self.versions, id, o),
             (Job::Installed { .. }, o) => finish(&mut self.installed, id, o),
             (Job::Pkg1 { .. }, o) => finish(&mut self.pkg1, id, o),
+            (Job::Ancestry { .. } | Job::Deps { .. }, o) => self.on_graph(id, o),
             (Job::Report { version, .. }, o) => {
                 if let Some(p) = &mut self.popup
                     && p.loading_id == Some(id)
@@ -822,6 +915,10 @@ impl App {
             }
             return;
         }
+        if self.graph.is_some() {
+            self.graph_key(k.code);
+            return;
+        }
         match k.code {
             KeyCode::Char('q') => self.quit = true,
             KeyCode::Char('?') => self.show_help(),
@@ -866,6 +963,10 @@ impl App {
     }
 
     fn tab_key(&mut self, c: char) {
+        if self.tab == Tab::Packages && matches!(c, 'a' | 'A' | 'd') {
+            self.open_graph_for_selection(c);
+            return;
+        }
         let pane = if self.tab == Tab::Packages && "RLVxiy".contains(c) {
             Tab::Versions
         } else {
@@ -1060,36 +1161,343 @@ impl App {
         else {
             return;
         };
+        self.open_version_details(v, kv_lines(&row));
+    }
+
+    /// Popup with `package version report --verbose` for a version.
+    fn open_version_details(&mut self, v: Id04t, mut lines: Vec<String>) {
         let Some(hub) = self.hub.as_ref().and_then(|h| org_ref(h).ok()) else {
+            self.status = "No Dev Hub selected.".into();
             return;
         };
-        let mut lines = kv_lines(&row);
         lines.insert(0, "Loading `package version report --verbose`…".into());
         lines.insert(1, String::new());
-        match self.submit(
-            Job::Report {
-                hub,
-                version: v.clone(),
+        let job = Job::Report {
+            hub,
+            version: v.clone(),
+        };
+        let (lines, loading_id) = match self.submit(job, false, new_cancel()) {
+            Ok((id, _)) => (lines, Some(id)),
+            Err(f) => (failure_lines(&f, ""), None),
+        };
+        self.popup = Some(Popup {
+            title: format!("Version {v}"),
+            lines,
+            scroll: 0,
+            loading_id,
+        });
+    }
+
+    // ----- Ancestry & Dependencies (docs/ideas/ANCESTRY_AND_DEPENDENCIES.md) --
+
+    fn selected_version_row(&self) -> Option<Value> {
+        self.version_rows()
+            .get(self.versions.scroll.selected)
+            .map(|v| (*v).clone())
+    }
+
+    /// `ContainerOptions` (Managed / Unlocked) of a package from the loaded list.
+    fn package_type(&self, id: &str) -> Option<String> {
+        let Load::Ready(d) = self.packages.load() else {
+            return None;
+        };
+        let id15 = &id[..id.len().min(15)];
+        d.rows
+            .iter()
+            .find(|r| str_of(r, "Id").is_some_and(|x| x.starts_with(id15)))
+            .and_then(|r| str_of(r, "ContainerOptions"))
+    }
+
+    fn package_name(&self, id: &str) -> String {
+        let Load::Ready(d) = self.packages.load() else {
+            return id.to_owned();
+        };
+        d.rows
+            .iter()
+            .find(|r| str_of(r, "Id").as_deref() == Some(id))
+            .and_then(|r| str_of(r, "Name"))
+            .unwrap_or_else(|| id.to_owned())
+    }
+
+    /// `a`: ancestry (from a version: highlighted path; from the package pane:
+    /// whole tree), `A`: whole package, `d`: dependencies of the selected version.
+    fn open_graph_for_selection(&mut self, c: char) {
+        if c == 'd' {
+            let Some(row) = self.selected_version_row() else {
+                self.status = "Select a version (right pane) first.".into();
+                return;
+            };
+            let Some(v) =
+                str_of(&row, "SubscriberPackageVersionId").and_then(|s| Id04t::new(&s).ok())
+            else {
+                return;
+            };
+            if let Some(t) = str_of(&row, "Package2Id").and_then(|p| self.package_type(&p))
+                && t != "Managed"
+                && t != "Unlocked"
+            {
+                self.status =
+                    format!("Dependencies are for unlocked or 2GP managed packages, not {t}.");
+                return;
+            }
+            let label = format!(
+                "{}@{}",
+                str_of(&row, "Package2Name").unwrap_or_default(),
+                str_of(&row, "Version").unwrap_or_default()
+            );
+            self.open_deps(v, label);
+            return;
+        }
+        let version = if self.pkg_focus {
+            None
+        } else {
+            self.selected_version_row()
+        };
+        let (pkg, focus, mut notes) = match (&version, c) {
+            (Some(row), 'a') => {
+                let mut notes = Vec::new();
+                if !versions::is_released(row) {
+                    notes.push(format!(
+                        "This version is not released: the CLI's ancestry tree has released versions \
+                         only. Its ancestor per the version list: {}.",
+                        str_of(row, "AncestorVersion").unwrap_or_else(|| "none".into())
+                    ));
+                }
+                (
+                    str_of(row, "Package2Id"),
+                    str_of(row, "SubscriberPackageVersionId"),
+                    notes,
+                )
+            }
+            (Some(row), _) => (str_of(row, "Package2Id"), None, vec![]),
+            (None, _) => (
+                self.selected_package().map(|p| p.0.as_str().to_owned()),
+                None,
+                vec![],
+            ),
+        };
+        let Some(pkg) = pkg.and_then(|p| Id0Ho::new(&p).ok()) else {
+            self.status = "Select a package (left) or a version (right) first.".into();
+            return;
+        };
+        if let Some(t) = self.package_type(pkg.as_str())
+            && t != "Managed"
+        {
+            self.status =
+                format!("Ancestry exists only for 2GP managed packages; this one is {t}.");
+            return;
+        }
+        notes.insert(
+            0,
+            "Released versions only (CLI rule). From `displayancestry --dot-code`, which includes \
+             every root."
+                .into(),
+        );
+        let Some(hub) = self.hub.as_ref().and_then(|h| org_ref(h).ok()) else {
+            self.status = "No Dev Hub selected.".into();
+            return;
+        };
+        let name = self.package_name(pkg.as_str());
+        let job = Job::Ancestry { hub, package: pkg };
+        self.start_graph(
+            GraphKind::Ancestry,
+            format!("Ancestry — {name}"),
+            job,
+            focus,
+            notes,
+        );
+    }
+
+    fn open_deps(&mut self, v: Id04t, label: String) {
+        let Some(hub) = self.hub.as_ref().and_then(|h| org_ref(h).ok()) else {
+            self.status = "No Dev Hub selected.".into();
+            return;
+        };
+        let mut notes = vec![
+            "Install from top to bottom (root-last order).".to_owned(),
+            "Needs a version built with \"calculateTransitiveDependencies\": true.".to_owned(),
+        ];
+        match self.org.as_ref().map(|o| o.target().to_owned()) {
+            Some(o) => {
+                notes.push(format!("\"In org\" checks {o} (its installed packages)."));
+                self.load_panel(Tab::Installed, false);
+            }
+            None => {
+                notes.push("Select an org (Orgs tab, o) to compare with what is installed.".into())
+            }
+        }
+        let job = Job::Deps {
+            hub,
+            version: v.clone(),
+        };
+        self.start_graph(
+            GraphKind::Deps,
+            format!("Dependencies — {label}"),
+            job,
+            Some(v.as_str().to_owned()),
+            notes,
+        );
+    }
+
+    fn start_graph(
+        &mut self,
+        kind: GraphKind,
+        title: String,
+        job: Job,
+        focus: Option<String>,
+        notes: Vec<String>,
+    ) {
+        let command = job.command();
+        let (loading, failure) = match self.submit(job, false, new_cancel()) {
+            Ok((id, _)) => (Some((id, Instant::now())), None),
+            Err(f) => (None, Some(f)),
+        };
+        self.graph = Some(GraphView {
+            kind,
+            title,
+            loading,
+            graph: None,
+            failure,
+            focus,
+            notes,
+            tree_mode: false,
+            scroll: Scroll::default(),
+            command,
+        });
+    }
+
+    fn on_graph(&mut self, id: u64, outcome: Outcome) {
+        let Some(gv) = &mut self.graph else { return };
+        if gv.loading.map(|l| l.0) != Some(id) {
+            return; // closed or replaced meanwhile
+        }
+        gv.loading = None;
+        match outcome {
+            Outcome::Ok {
+                value: Value::String(dot),
+                ..
+            } => match dag::parse_dot(&dot) {
+                Ok(g) => {
+                    if gv.kind == GraphKind::Ancestry
+                        && gv.focus.as_ref().is_some_and(|f| g.node(f).is_none())
+                    {
+                        gv.focus = None;
+                    }
+                    if gv.kind == GraphKind::Deps && g.nodes.len() <= 1 {
+                        gv.notes
+                            .push("No dependencies: this version installs on its own.".into());
+                    }
+                    gv.graph = Some(g);
+                    if let Some(f) = gv.focus.clone()
+                        && let Some(i) = gv.rows().iter().position(|r| r.id == f)
+                    {
+                        gv.scroll.selected = i;
+                    }
+                }
+                Err(e) => gv.failure = Some(Failure::simple(e.to_string())),
             },
-            false,
-            new_cancel(),
-        ) {
-            Ok((id, _)) => {
-                self.popup = Some(Popup {
-                    title: format!("Version {v}"),
-                    lines,
-                    scroll: 0,
-                    loading_id: Some(id),
-                });
+            Outcome::Ok { value, .. } => {
+                gv.failure = Some(Failure::simple(format!(
+                    "Unexpected output (not DOT): {value}"
+                )));
             }
-            Err(f) => {
-                self.popup = Some(Popup {
-                    title: format!("Version {v}"),
-                    lines: failure_lines(&f, ""),
-                    scroll: 0,
-                    loading_id: None,
-                });
+            Outcome::Failed(f) => {
+                if f.message.contains("calculateTransitiveDependencies")
+                    || f.message.contains("CalcTransitiveDependencies")
+                {
+                    gv.notes.push(
+                        "This version was built without transitive dependencies. To see them, add \
+                         \"calculateTransitiveDependencies\": true to its package directory in \
+                         sfdx-project.json and create a new version (GP Atlas never edits the file)."
+                            .into(),
+                    );
+                }
+                gv.failure = Some(f);
             }
+            Outcome::Cancelled | Outcome::Doctor(_) => {
+                gv.failure = Some(Failure::simple("Cancelled."));
+            }
+        }
+    }
+
+    fn graph_key(&mut self, code: KeyCode) {
+        let Some(gv) = &mut self.graph else { return };
+        let len = gv.rows().len();
+        match code {
+            KeyCode::Esc | KeyCode::Char('q') => self.graph = None,
+            KeyCode::Down | KeyCode::Char('j') => gv.scroll.move_by(1, len),
+            KeyCode::Up | KeyCode::Char('k') => gv.scroll.move_by(-1, len),
+            KeyCode::PageDown => gv.scroll.move_by(20, len),
+            KeyCode::PageUp => gv.scroll.move_by(-20, len),
+            KeyCode::Home | KeyCode::Char('g') => gv.scroll.move_by(isize::MIN / 2, len),
+            KeyCode::End | KeyCode::Char('G') => gv.scroll.move_by(isize::MAX / 2, len),
+            KeyCode::Char('t') if gv.kind == GraphKind::Deps => {
+                gv.tree_mode = !gv.tree_mode;
+                gv.scroll = Scroll::default();
+            }
+            KeyCode::Char('y') => {
+                let cmd = gv.command.clone();
+                if let Some(text) = cmd.and_then(|c| clip::command_for_copy(&c, &self.manifest)) {
+                    self.copy(&text, "command");
+                }
+            }
+            KeyCode::Char('c') => {
+                if let Some(id) = self.graph_selected_id() {
+                    self.copy(&id, "04t id");
+                }
+            }
+            KeyCode::Char('i') => {
+                if let Some(id) = self.graph_selected_id() {
+                    self.copy(&format!("{INSTALL_URL_BASE}{id}"), "install link");
+                }
+            }
+            KeyCode::Enter => self.graph_activate(),
+            _ => {}
+        }
+    }
+
+    fn graph_selected_id(&self) -> Option<String> {
+        let gv = self.graph.as_ref()?;
+        let rows = gv.rows();
+        let id = rows.get(gv.scroll.selected)?.id.clone();
+        id.starts_with("04t").then_some(id)
+    }
+
+    fn graph_activate(&mut self) {
+        let Some(v) = self.graph_selected_id().and_then(|s| Id04t::new(&s).ok()) else {
+            return;
+        };
+        self.open_version_details(v, vec![]);
+    }
+
+    /// Install state of a dependency in the selected org, as short text.
+    pub fn install_text(&self, id: &str) -> (String, &'static str) {
+        let (Some(org), Some(g)) = (
+            &self.org,
+            self.graph.as_ref().and_then(|g| g.graph.as_ref()),
+        ) else {
+            return ("—".into(), "dim");
+        };
+        let Some(node) = g.node(id) else {
+            return (String::new(), "dim");
+        };
+        if node.id == "VERSION_BEING_BUILT" {
+            return ("being built".into(), "dim");
+        }
+        if self.installed.for_org.as_deref() != Some(org.username.as_str()) {
+            return ("…".into(), "dim");
+        }
+        match self.installed.load() {
+            Load::Ready(d) => match dag::install_state(node, &d.rows) {
+                dag::InstallState::Same => ("✅ installed".into(), "ok"),
+                dag::InstallState::Newer(v) => (format!("✅ newer {v}"), "ok"),
+                dag::InstallState::Older(v) => (format!("⚠ older {v}"), "warn"),
+                dag::InstallState::Missing => ("⛔ missing".into(), "bad"),
+                dag::InstallState::Unknown => ("?".into(), "dim"),
+            },
+            Load::Loading { .. } => ("…".into(), "dim"),
+            Load::Failed(_) => ("? (installed list failed)".into(), "warn"),
+            Load::Idle => ("—".into(), "dim"),
         }
     }
 
@@ -1162,6 +1570,10 @@ impl App {
             "               R released  L latest per package  V verbose  x  all packages",
             "               c copy 0Ho (left) / 04t (right)  i copy install link  y copy report cmd",
             "               Enter on a version: details (package version report)",
+            "               a  ancestry (version: highlighted path; package: whole tree)",
+            "               A  whole package ancestry    d  dependencies (install order)",
+            "Graph view     c copy 04t  i install link  t order/tree (deps)  y copy command",
+            "               Enter version details      Esc close",
             "Installed/1GP  c  copy 04t            Enter  details",
             "History        c  copy command        Enter  details (exit code, stderr)",
             "",
@@ -1182,6 +1594,24 @@ impl App {
                 if let Some(r) = self.hits.popup {
                     if !r.contains(pos) {
                         self.popup = None;
+                    }
+                    return;
+                }
+                if self.graph.is_some() {
+                    match (self.hits.graph, self.hits.graph_rows) {
+                        (Some(area), _) if !area.contains(pos) => self.graph = None,
+                        (_, Some(rows)) if rows.contains(pos) => {
+                            let gv = self.graph.as_mut().expect("graph");
+                            let idx = gv.scroll.offset + (m.row - rows.y) as usize;
+                            if idx < gv.rows().len() {
+                                let again = gv.scroll.selected == idx;
+                                gv.scroll.selected = idx;
+                                if again {
+                                    self.graph_activate();
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                     return;
                 }
@@ -1234,6 +1664,12 @@ impl App {
                 } else if again {
                     self.activate();
                 }
+            }
+            MouseEventKind::ScrollDown if self.popup.is_none() && self.graph.is_some() => {
+                self.graph_key(KeyCode::PageDown);
+            }
+            MouseEventKind::ScrollUp if self.popup.is_none() && self.graph.is_some() => {
+                self.graph_key(KeyCode::PageUp);
             }
             MouseEventKind::ScrollDown => match &mut self.popup {
                 Some(p) => p.scroll = p.scroll.saturating_add(3),

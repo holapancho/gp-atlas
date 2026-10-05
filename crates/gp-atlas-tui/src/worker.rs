@@ -11,10 +11,10 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use gp_atlas_core::classify::{CapState, Classified, UnknownReason, classify};
-use gp_atlas_core::command::{PkgVersionListArgs, ReadOnlyCommand};
+use gp_atlas_core::command::{EdgeDirection, PkgVersionListArgs, ReadOnlyCommand};
 use gp_atlas_core::doctor::{self, DoctorReport};
 use gp_atlas_core::envelope::{self, SfOutput};
-use gp_atlas_core::ids::{Id04t, OrgRef, PackageRef};
+use gp_atlas_core::ids::{AncestryTarget, DependencyTarget, Id0Ho, Id04t, OrgRef, PackageRef};
 use gp_atlas_core::manifest::Manifest;
 use gp_atlas_core::probes::Capability;
 use gp_atlas_core::runner::{RunOutput, SfRunner};
@@ -39,6 +39,16 @@ pub enum Job {
         args: Box<PkgVersionListArgs>,
     },
     Report {
+        hub: OrgRef,
+        version: Id04t,
+    },
+    /// Whole-package ancestry as DOT (all roots; the JSON form keeps only one).
+    Ancestry {
+        hub: OrgRef,
+        package: Id0Ho,
+    },
+    /// Dependency graph in install order (root-last).
+    Deps {
         hub: OrgRef,
         version: Id04t,
     },
@@ -69,6 +79,18 @@ impl Job {
                 hub: hub.clone(),
                 package: PackageRef::Id(version.clone()),
                 verbose: true,
+            },
+            Job::Ancestry { hub, package } => ReadOnlyCommand::PkgVersionAncestry {
+                hub: hub.clone(),
+                package: AncestryTarget::Package(package.clone()),
+                dot_code: true,
+                verbose: false,
+            },
+            Job::Deps { hub, version } => ReadOnlyCommand::PkgVersionDeps {
+                hub: hub.clone(),
+                package: DependencyTarget::Version(version.clone()),
+                edge_direction: Some(EdgeDirection::RootLast),
+                verbose: false,
             },
             Job::Installed { org } => ReadOnlyCommand::PkgInstalledList { org: org.clone() },
             Job::Pkg1 { org } => ReadOnlyCommand::Pkg1VersionList {

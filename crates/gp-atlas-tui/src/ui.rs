@@ -13,7 +13,7 @@ use ratatui::widgets::{
     Block, Borders, Cell as TCell, Clear, Paragraph, Row, Table, TableState, Wrap,
 };
 
-use crate::app::{App, Cell, Gate, Load, Scroll, Tab, cell_text, failure_lines};
+use crate::app::{App, Cell, Gate, GraphKind, Load, Scroll, Tab, cell_text, failure_lines};
 
 const SPINNER: [&str; 4] = ["◐", "◓", "◑", "◒"];
 
@@ -52,6 +52,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Tab::Log => draw_log(f, app, body),
     }
     draw_footer(f, app, footer);
+    if app.graph.is_some() {
+        draw_graph(f, app, body);
+    }
     if app.popup.is_some() {
         draw_popup(f, app);
     }
@@ -127,20 +130,33 @@ fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
-    let hints = match app.pane() {
-        Tab::Doctor => "r re-run checks",
-        Tab::Orgs => "h use as Dev Hub · o use as org · Enter select · r refresh",
-        Tab::Access => {
-            "p probe org · a probe all · t try 2GP on non-hubs · ←→ column · Enter details · Esc cancel"
+    let graph_hints = match app.graph.as_ref().map(|g| g.kind) {
+        Some(GraphKind::Ancestry) => Some(
+            "↑↓ move · Enter version details · c copy 04t · i install link · y copy command · Esc close",
+        ),
+        Some(GraphKind::Deps) => Some(
+            "t order/tree · ↑↓ move · Enter details · c copy 04t · i install link · y copy command · Esc close",
+        ),
+        None => None,
+    };
+    let hints = if let Some(h) = graph_hints {
+        h
+    } else {
+        match app.pane() {
+            Tab::Doctor => "r re-run checks",
+            Tab::Orgs => "h use as Dev Hub · o use as org · Enter select · r refresh",
+            Tab::Access => {
+                "p probe org · a probe all · t try 2GP on non-hubs · ←→ column · Enter details · Esc cancel"
+            }
+            Tab::Packages => {
+                "↑↓/click: versions · → or Enter: go to versions · a/A ancestry · c copy 0Ho · r refresh"
+            }
+            Tab::Versions => {
+                "← pkgs · a ancestry · d dependencies · R released · L latest · V verbose · x all · c 04t · i link · Enter details"
+            }
+            Tab::Installed | Tab::Pkg1 => "c copy 04t · Enter details · r refresh",
+            Tab::Log => "Enter details · c copy command",
         }
-        Tab::Packages => {
-            "↑↓/click: show a package's versions · → or Enter: go to versions · c copy 0Ho · r refresh"
-        }
-        Tab::Versions => {
-            "← packages · R released · L latest · V verbose · x all pkgs · c 04t · i install link · y report cmd · Enter details"
-        }
-        Tab::Installed | Tab::Pkg1 => "c copy 04t · Enter details · r refresh",
-        Tab::Log => "Enter details · c copy command",
     };
     let lines = vec![
         Line::from(vec![
@@ -524,7 +540,7 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<
                 .collect();
             l.push(Line::from(""));
             l.push(Line::styled(
-                " r retry · History (8) shows the exact sf command",
+                " r retry · History (7) shows the exact sf command",
                 dim(),
             ));
             return message(f, area, title, l);
@@ -743,6 +759,133 @@ fn draw_2gp(f: &mut Frame, app: &mut App, area: Rect) {
     draw_panel(f, app, right, Tab::Versions, Some(!focus_left));
 }
 
+/// Ancestry / Dependencies overlay over the body area.
+fn draw_graph(f: &mut Frame, app: &mut App, area: Rect) {
+    let rect = area;
+    f.render_widget(Clear, rect);
+    app.hits.graph = Some(rect);
+    let Some(gv) = &app.graph else { return };
+    let block = Block::bordered()
+        .title(format!(" {} ", gv.title))
+        .border_style(Style::new().fg(Color::Cyan))
+        .style(Style::new().bg(Color::Black));
+    let inner = block.inner(rect);
+    f.render_widget(block, rect);
+    let mut head: Vec<Line> = gv
+        .notes
+        .iter()
+        .map(|n| Line::styled(format!(" {n}"), dim()))
+        .collect();
+    if let Some((_, since)) = gv.loading {
+        head.push(loading_line(&since, "Running sf"));
+    }
+    let failure = gv.failure.clone();
+    let head_h = (head.len() as u16 + 1).min(inner.height);
+    let [top, rest] =
+        Layout::vertical([Constraint::Length(head_h), Constraint::Fill(1)]).areas(inner);
+    f.render_widget(Paragraph::new(head).wrap(Wrap { trim: false }), top);
+    if let Some(fl) = failure {
+        let mut l: Vec<Line> = failure_lines(&fl, "").into_iter().map(Line::from).collect();
+        l.push(Line::from(""));
+        l.push(Line::styled(
+            " History (7) shows the exact sf command and stderr.",
+            dim(),
+        ));
+        f.render_widget(Paragraph::new(l).wrap(Wrap { trim: false }), rest);
+        return;
+    }
+    let rows = gv.rows();
+    if rows.is_empty() {
+        return;
+    }
+    let kind = gv.kind;
+    let tree_mode = gv.tree_mode;
+    let installed: Vec<(String, &'static str)> = if kind == GraphKind::Deps {
+        rows.iter().map(|r| app.install_text(&r.id)).collect()
+    } else {
+        vec![]
+    };
+    let (title, header, widths): (String, Vec<&str>, Vec<Constraint>) = match kind {
+        GraphKind::Ancestry => (
+            format!(" {} released versions ", rows.len()),
+            vec!["Version tree", "04t", "Built on it"],
+            vec![
+                Constraint::Fill(1),
+                Constraint::Length(19),
+                Constraint::Length(12),
+            ],
+        ),
+        GraphKind::Deps => (
+            if tree_mode {
+                " Dependency tree (selected package at the top) ".into()
+            } else {
+                " Install order ".into()
+            },
+            vec!["Package @ version", "04t", "In org"],
+            vec![
+                Constraint::Fill(1),
+                Constraint::Length(19),
+                Constraint::Length(22),
+            ],
+        ),
+    };
+    let mut tmp = Vec::new();
+    let gv = app.graph.as_mut().expect("graph");
+    draw_rows(
+        f,
+        &mut tmp,
+        Tab::Log,
+        None,
+        rest,
+        title,
+        &header,
+        &widths,
+        rows.len(),
+        &mut gv.scroll,
+        |i| {
+            let r = &rows[i];
+            let mut style = Style::new();
+            if r.on_path {
+                style = style.fg(Color::Yellow);
+            }
+            if r.focus {
+                style = style.add_modifier(Modifier::BOLD);
+            }
+            let mut label = format!("{}{}", r.prefix, r.label);
+            if r.focus {
+                label.push_str("  ◀ this version");
+            } else if kind == GraphKind::Deps && r.highlighted {
+                label.push_str("  (direct)");
+            }
+            let third = match kind {
+                GraphKind::Ancestry => {
+                    if r.children > 0 {
+                        TCell::from(r.children.to_string())
+                    } else {
+                        TCell::from("")
+                    }
+                }
+                GraphKind::Deps => {
+                    let (t, s) = installed[i].clone();
+                    let st = match s {
+                        "ok" => Style::new().fg(Color::Green),
+                        "warn" => Style::new().fg(Color::Yellow),
+                        "bad" => Style::new().fg(Color::Red),
+                        _ => dim(),
+                    };
+                    TCell::from(t).style(st)
+                }
+            };
+            vec![
+                TCell::from(label).style(style),
+                TCell::from(r.id.clone()).style(dim()),
+                third,
+            ]
+        },
+    );
+    app.hits.graph_rows = tmp.first().map(|(r, _)| *r);
+}
+
 fn draw_log(f: &mut Frame, app: &mut App, area: Rect) {
     let entries: Vec<_> = app.log.iter().rev().cloned().collect();
     if entries.is_empty() {
@@ -911,6 +1054,51 @@ mod tests {
                     term.draw(|f| draw(f, &mut app)).unwrap();
                 }
             }
+        }
+    }
+
+    #[test]
+    fn graph_views_render_at_any_size() {
+        use crate::app::{GraphKind, GraphView};
+        let anc = "strict graph G {\n\t node04tA [label=\"1.0.0.1\"]\n\t node04tB [label=\"1.1.0.1\"]\n\t node04tA -- node04tB\n}";
+        let deps = "strict digraph G {\n\t node_04tX [label=\"Base@1.0.0.1\"]\n\t node_04tY [label=\"App@2.0.0.1\" color=\"green\"]\n\t node_04tX -> node_04tY\n}";
+        let mut app = app();
+        app.tab = Tab::Packages;
+        for (kind, dot, tree) in [
+            (GraphKind::Ancestry, anc, false),
+            (GraphKind::Deps, deps, false),
+            (GraphKind::Deps, deps, true),
+        ] {
+            app.graph = Some(GraphView {
+                kind,
+                title: "t".into(),
+                loading: None,
+                graph: Some(gp_atlas_core::graph::parse_dot(dot).unwrap()),
+                failure: None,
+                focus: Some("04tB".into()),
+                notes: vec!["note".repeat(50)],
+                tree_mode: tree,
+                scroll: Scroll::default(),
+                command: None,
+            });
+            for (w, h) in [(150, 40), (60, 12), (8, 4), (1, 1)] {
+                let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
+                term.draw(|f| draw(f, &mut app)).unwrap();
+            }
+            let mut term = Terminal::new(TestBackend::new(150, 30)).unwrap();
+            term.draw(|f| draw(f, &mut app)).unwrap();
+            let text: String = term
+                .backend()
+                .buffer()
+                .content()
+                .iter()
+                .map(|c| c.symbol())
+                .collect();
+            assert!(
+                text.contains("◀ this version") || kind == GraphKind::Deps,
+                "{text}"
+            );
+            assert!(app.hits.graph_rows.is_some());
         }
     }
 
