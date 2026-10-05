@@ -38,12 +38,12 @@ pub enum Tab {
 }
 
 impl Tab {
-    pub const ALL: [Tab; 8] = [
+    /// Visible tabs. `Versions` is not a tab: it is the right pane of `Packages`.
+    pub const ALL: [Tab; 7] = [
         Tab::Doctor,
         Tab::Orgs,
         Tab::Access,
         Tab::Packages,
-        Tab::Versions,
         Tab::Installed,
         Tab::Pkg1,
         Tab::Log,
@@ -54,7 +54,7 @@ impl Tab {
             Tab::Doctor => "Doctor",
             Tab::Orgs => "Orgs",
             Tab::Access => "Access",
-            Tab::Packages => "2GP Packages",
+            Tab::Packages => "2GP Packages & Versions",
             Tab::Versions => "2GP Versions",
             Tab::Installed => "Installed",
             Tab::Pkg1 => "1GP Versions",
@@ -181,8 +181,9 @@ pub struct Popup {
 #[derive(Default)]
 pub struct Hits {
     pub tabs: Vec<(Rect, Tab)>,
-    /// Rows area of the current table (below its header).
-    pub rows: Option<Rect>,
+    /// Rows areas of the visible tables (below their headers), with the pane
+    /// they belong to (`Packages`/`Versions` on the 2GP tab, else the tab).
+    pub rows: Vec<(Rect, Tab)>,
     /// Column x-ranges of the Access matrix capability columns.
     pub access_cols: Vec<(u16, u16)>,
     pub popup: Option<Rect>,
@@ -211,6 +212,10 @@ pub struct App {
     pub packages: Panel,
     pub versions: Panel,
     pub vfilter: VersionFilter,
+    /// 2GP tab: true when the packages (left) pane has focus.
+    pub pkg_focus: bool,
+    /// 2GP tab: when the package selection last changed (debounced load).
+    pkg_changed: Option<Instant>,
     pub installed: Panel,
     pub pkg1: Panel,
     pub log: Vec<LogEntry>,
@@ -250,6 +255,8 @@ impl App {
             packages: Panel::default(),
             versions: Panel::default(),
             vfilter: VersionFilter::default(),
+            pkg_focus: true,
+            pkg_changed: None,
             installed: Panel::default(),
             pkg1: Panel::default(),
             log: Vec::new(),
@@ -537,6 +544,11 @@ impl App {
     pub fn load_tab(&mut self, force: bool) {
         let tab = self.tab;
         match tab {
+            Tab::Packages => {
+                self.load_panel(Tab::Packages, force);
+                self.load_panel(Tab::Versions, force);
+                return;
+            }
             Tab::Doctor => {
                 if force {
                     self.gate = Gate::Checking;
@@ -553,6 +565,11 @@ impl App {
             Tab::Log => return,
             _ => {}
         }
+        self.load_panel(tab, force);
+    }
+
+    /// Loads one data panel if needed (or always, with `force`).
+    fn load_panel(&mut self, tab: Tab, force: bool) {
         if !matches!(self.gate, Gate::Ok { .. }) {
             return;
         }
@@ -651,19 +668,63 @@ impl App {
 
     // ----- input -----------------------------------------------------------
 
+    /// The pane keys and selection apply to: on the 2GP tab, packages (left)
+    /// or versions (right); otherwise the tab itself.
+    pub fn pane(&self) -> Tab {
+        if self.tab == Tab::Packages && !self.pkg_focus {
+            Tab::Versions
+        } else {
+            self.tab
+        }
+    }
+
+    /// The package selected in the 2GP left pane (row 0 = all packages).
+    pub fn selected_package(&self) -> Option<(Id0Ho, String)> {
+        let sel = self.packages.scroll.selected.checked_sub(1)?;
+        let Load::Ready(d) = self.packages.load() else {
+            return None;
+        };
+        let row = d.rows.get(sel)?;
+        let id = str_of(row, "Id").and_then(|i| Id0Ho::new(&i).ok())?;
+        Some((id, str_of(row, "Name").unwrap_or_default()))
+    }
+
+    /// Loads versions for the selected package now.
+    fn apply_package_selection(&mut self) {
+        self.pkg_changed = None;
+        let want = self.selected_package();
+        let same = want.as_ref().map(|p| &p.0) == self.vfilter.package.as_ref().map(|p| &p.0);
+        if same && !matches!(self.versions.load(), Load::Idle | Load::Failed(_)) {
+            return;
+        }
+        self.vfilter.package = want;
+        self.load_panel(Tab::Versions, true);
+    }
+
+    /// Called every frame: applies a debounced package selection.
+    pub fn tick(&mut self) {
+        if let Some(t) = self.pkg_changed
+            && t.elapsed().as_millis() >= 350
+        {
+            self.apply_package_selection();
+        }
+    }
+
     fn table_len(&self) -> usize {
-        match self.tab {
+        match self.pane() {
             Tab::Orgs | Tab::Access => match &self.orgs {
                 Load::Ready(l) => l.len(),
                 _ => 0,
             },
             Tab::Versions => self.version_rows().len(),
-            Tab::Packages | Tab::Installed | Tab::Pkg1 => {
-                match self.panel_ref(self.tab).map(Panel::load) {
-                    Some(Load::Ready(d)) => d.rows.len(),
-                    _ => 0,
-                }
-            }
+            Tab::Packages => match self.packages.load() {
+                Load::Ready(d) => d.rows.len() + 1, // + "All packages"
+                _ => 0,
+            },
+            Tab::Installed | Tab::Pkg1 => match self.panel_ref(self.pane()).map(Panel::load) {
+                Some(Load::Ready(d)) => d.rows.len(),
+                _ => 0,
+            },
             Tab::Log => self.log.len(),
             Tab::Doctor => 0,
         }
@@ -680,7 +741,7 @@ impl App {
     }
 
     pub fn scroll_mut(&mut self) -> Option<&mut Scroll> {
-        Some(match self.tab {
+        Some(match self.pane() {
             Tab::Orgs => &mut self.orgs_scroll,
             Tab::Access => &mut self.access_scroll,
             Tab::Log => &mut self.log_scroll,
@@ -699,13 +760,18 @@ impl App {
     }
 
     fn selected_row(&self) -> Option<Value> {
-        let sel = self.panel_ref(self.tab)?.scroll.selected;
-        if self.tab == Tab::Versions {
-            return self.version_rows().get(sel).map(|v| (*v).clone());
-        }
-        match self.panel_ref(self.tab)?.load() {
-            Load::Ready(d) => d.rows.get(sel).cloned(),
-            _ => None,
+        let pane = self.pane();
+        let sel = self.panel_ref(pane)?.scroll.selected;
+        match pane {
+            Tab::Versions => self.version_rows().get(sel).map(|v| (*v).clone()),
+            Tab::Packages => match self.packages.load() {
+                Load::Ready(d) => d.rows.get(sel.checked_sub(1)?).cloned(),
+                _ => None,
+            },
+            _ => match self.panel_ref(pane)?.load() {
+                Load::Ready(d) => d.rows.get(sel).cloned(),
+                _ => None,
+            },
         }
     }
 
@@ -723,8 +789,12 @@ impl App {
 
     fn move_sel(&mut self, delta: isize) {
         let len = self.table_len();
+        let before = self.scroll_mut().map(|s| s.selected);
         if let Some(s) = self.scroll_mut() {
             s.move_by(delta, len);
+        }
+        if self.pane() == Tab::Packages && self.scroll_mut().map(|s| s.selected) != before {
+            self.pkg_changed = Some(Instant::now());
         }
     }
 
@@ -756,21 +826,26 @@ impl App {
             KeyCode::Char('q') => self.quit = true,
             KeyCode::Char('?') => self.show_help(),
             KeyCode::Esc => self.cancel_current(),
-            KeyCode::Tab | KeyCode::Right if k.code == KeyCode::Tab || self.tab != Tab::Access => {
+            KeyCode::Tab | KeyCode::Right
+                if k.code == KeyCode::Tab || !matches!(self.tab, Tab::Access | Tab::Packages) =>
+            {
                 let i = Tab::ALL.iter().position(|t| *t == self.tab).unwrap_or(0);
                 self.switch_tab(Tab::ALL[(i + 1) % Tab::ALL.len()]);
             }
             KeyCode::BackTab | KeyCode::Left
-                if k.code == KeyCode::BackTab || self.tab != Tab::Access =>
+                if k.code == KeyCode::BackTab
+                    || !matches!(self.tab, Tab::Access | Tab::Packages) =>
             {
                 let i = Tab::ALL.iter().position(|t| *t == self.tab).unwrap_or(0);
                 self.switch_tab(Tab::ALL[(i + Tab::ALL.len() - 1) % Tab::ALL.len()]);
             }
+            KeyCode::Left if self.tab == Tab::Packages => self.pkg_focus = true,
+            KeyCode::Right if self.tab == Tab::Packages => self.pkg_focus = false,
             KeyCode::Left => self.access_col = self.access_col.saturating_sub(1),
             KeyCode::Right => {
                 self.access_col = (self.access_col + 1).min(Capability::ALL.len() - 1)
             }
-            KeyCode::Char(c @ '1'..='8') => {
+            KeyCode::Char(c @ '1'..='7') => {
                 let i = c as usize - '1' as usize;
                 self.switch_tab(Tab::ALL[i]);
             }
@@ -791,7 +866,12 @@ impl App {
     }
 
     fn tab_key(&mut self, c: char) {
-        match (self.tab, c) {
+        let pane = if self.tab == Tab::Packages && "RLVxiy".contains(c) {
+            Tab::Versions
+        } else {
+            self.pane()
+        };
+        match (pane, c) {
             (Tab::Orgs, 'h') => self.pick_org(true),
             (Tab::Orgs, 'o') => self.pick_org(false),
             (Tab::Access, 'p') => {
@@ -812,13 +892,16 @@ impl App {
             (Tab::Versions, 'L') => {
                 self.vfilter.latest = !self.vfilter.latest;
                 if self.vfilter.latest && !self.vfilter.released {
-                    self.load_tab(true);
+                    self.load_panel(Tab::Versions, true);
                 } else {
                     self.versions.scroll = Scroll::default();
                 }
             }
             (Tab::Versions, 'V') => self.toggle_filter(|f| f.verbose = !f.verbose),
-            (Tab::Versions, 'x') => self.toggle_filter(|f| f.package = None),
+            (Tab::Versions, 'x') => {
+                self.packages.scroll = Scroll::default();
+                self.apply_package_selection();
+            }
             (Tab::Versions, 'i') => {
                 if let Some(u) = self.selected_row().and_then(|r| str_of(&r, "InstallUrl")) {
                     self.copy(&u, "install link");
@@ -842,7 +925,7 @@ impl App {
 
     fn toggle_filter(&mut self, f: impl FnOnce(&mut VersionFilter)) {
         f(&mut self.vfilter);
-        self.load_tab(true);
+        self.load_panel(Tab::Versions, true);
     }
 
     fn pick_org(&mut self, as_hub: bool) {
@@ -867,7 +950,7 @@ impl App {
     }
 
     fn activate(&mut self) {
-        match self.tab {
+        match self.pane() {
             Tab::Orgs => {
                 let is_hub = self
                     .selected_org(self.orgs_scroll)
@@ -876,18 +959,9 @@ impl App {
             }
             Tab::Access => self.cell_details(),
             Tab::Packages => {
-                let Some(row) = self.selected_row() else {
-                    return;
-                };
-                let (Some(id), name) = (
-                    str_of(&row, "Id").and_then(|i| Id0Ho::new(&i).ok()),
-                    str_of(&row, "Name").unwrap_or_default(),
-                ) else {
-                    return;
-                };
-                self.vfilter.package = Some((id, name));
-                self.tab = Tab::Versions;
-                self.load_tab(true);
+                // Show this package's versions now and move focus to them.
+                self.apply_package_selection();
+                self.pkg_focus = false;
             }
             Tab::Versions => self.version_details(),
             Tab::Installed | Tab::Pkg1 => {
@@ -1076,17 +1150,18 @@ impl App {
             "       wheel scrolls. (Hold Shift/Option to select text in the terminal.)",
             "",
             "Keys (all tabs)",
-            "  1-8 / Tab / Shift-Tab   switch tab        ↑↓ j k PgUp PgDn g G   move",
+            "  1-7 / Tab / Shift-Tab   switch tab        ↑↓ j k PgUp PgDn g G   move",
             "  Enter                   open / select     r   refresh this tab",
             "  Esc                     cancel / close    ?   help      q  quit",
             "",
             "Orgs           h  use as Dev Hub      o  use as target org   Enter  either",
             "Access         p  probe this org      a  probe all orgs      t  try 2GP on non-hubs",
             "               ←→ choose column       Enter  details of the selected cell",
-            "2GP Packages   Enter  show its versions                       c  copy 0Ho",
-            "2GP Versions   R released  L latest per package  V verbose  x  all packages",
-            "               c copy 04t  i copy install link  y copy report command",
-            "               Enter  details (package version report)",
+            "2GP            left: packages · right: versions of the selected package",
+            "               ←/→ or click: switch pane   ↑↓/click a package: show its versions",
+            "               R released  L latest per package  V verbose  x  all packages",
+            "               c copy 0Ho (left) / 04t (right)  i copy install link  y copy report cmd",
+            "               Enter on a version: details (package version report)",
             "Installed/1GP  c  copy 04t            Enter  details",
             "History        c  copy command        Enter  details (exit code, stderr)",
             "",
@@ -1120,9 +1195,17 @@ impl App {
                     self.switch_tab(tab);
                     return;
                 }
-                let Some(rows) = self.hits.rows else { return };
-                if !rows.contains(pos) {
+                let Some((rows, pane)) = self
+                    .hits
+                    .rows
+                    .iter()
+                    .copied()
+                    .find(|(r, _)| r.contains(pos))
+                else {
                     return;
+                };
+                if self.tab == Tab::Packages {
+                    self.pkg_focus = pane == Tab::Packages;
                 }
                 if self.tab == Tab::Access
                     && let Some(i) = self
@@ -1141,7 +1224,14 @@ impl App {
                 }
                 let again = s.selected == idx;
                 s.selected = idx;
-                if again {
+                if pane == Tab::Packages {
+                    // A click on a package shows its versions right away;
+                    // clicking it again moves focus to the versions pane.
+                    self.apply_package_selection();
+                    if again {
+                        self.pkg_focus = false;
+                    }
+                } else if again {
                     self.activate();
                 }
             }

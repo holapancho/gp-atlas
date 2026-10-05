@@ -44,7 +44,11 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Tab::Doctor => draw_doctor(f, app, body),
         Tab::Orgs => draw_orgs(f, app, body),
         Tab::Access => draw_access(f, app, body),
-        Tab::Packages | Tab::Versions | Tab::Installed | Tab::Pkg1 => draw_panel(f, app, body),
+        Tab::Packages | Tab::Versions => draw_2gp(f, app, body),
+        Tab::Installed | Tab::Pkg1 => {
+            let tab = app.tab;
+            draw_panel(f, app, body, tab, None);
+        }
         Tab::Log => draw_log(f, app, body),
     }
     draw_footer(f, app, footer);
@@ -123,15 +127,17 @@ fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
-    let hints = match app.tab {
+    let hints = match app.pane() {
         Tab::Doctor => "r re-run checks",
         Tab::Orgs => "h use as Dev Hub · o use as org · Enter select · r refresh",
         Tab::Access => {
             "p probe org · a probe all · t try 2GP on non-hubs · ←→ column · Enter details · Esc cancel"
         }
-        Tab::Packages => "Enter versions · c copy 0Ho · r refresh",
+        Tab::Packages => {
+            "↑↓/click: show a package's versions · → or Enter: go to versions · c copy 0Ho · r refresh"
+        }
         Tab::Versions => {
-            "R released · L latest · V verbose · x all pkgs · c 04t · i install link · y report cmd · Enter details"
+            "← packages · R released · L latest · V verbose · x all pkgs · c 04t · i install link · y report cmd · Enter details"
         }
         Tab::Installed | Tab::Pkg1 => "c copy 04t · Enter details · r refresh",
         Tab::Log => "Enter details · c copy command",
@@ -218,11 +224,15 @@ fn draw_doctor(f: &mut Frame, app: &App, area: Rect) {
     );
 }
 
-/// Draws a table, building only the visible rows. Records the rows area for clicks.
+/// Draws a table, building only the visible rows. Records the rows area for
+/// clicks under `pane`. `focus`: `None` for a single table, `Some(is_focused)`
+/// for one of two side-by-side panes.
 #[allow(clippy::too_many_arguments)]
 fn draw_rows(
     f: &mut Frame,
-    hits_rows: &mut Option<Rect>,
+    hits: &mut Vec<(Rect, Tab)>,
+    pane: Tab,
+    focus: Option<bool>,
     area: Rect,
     title: String,
     header: &[&str],
@@ -231,7 +241,13 @@ fn draw_rows(
     scroll: &mut Scroll,
     row: impl Fn(usize) -> Vec<TCell<'static>>,
 ) {
-    let block = Block::bordered().title(title);
+    let block = match focus {
+        Some(true) => Block::bordered()
+            .title(title)
+            .border_style(Style::new().fg(Color::Cyan)),
+        Some(false) => Block::bordered().title(title).border_style(dim()),
+        None => Block::bordered().title(title),
+    };
     let inner = block.inner(area);
     let height = inner.height.saturating_sub(1) as usize; // minus header row
     scroll.fit(height, len);
@@ -246,19 +262,24 @@ fn draw_rows(
             Row::new(header.iter().map(|h| TCell::from(h.to_string())))
                 .style(Style::new().bold().underlined()),
         )
-        .row_highlight_style(
+        .row_highlight_style(if focus == Some(false) {
+            Style::new().add_modifier(Modifier::BOLD)
+        } else {
             Style::new()
                 .bg(Color::DarkGray)
-                .add_modifier(Modifier::BOLD),
-        )
+                .add_modifier(Modifier::BOLD)
+        })
         .highlight_symbol("▶ ")
         .block(block);
     f.render_stateful_widget(table, area, &mut state);
-    *hits_rows = Some(Rect::new(
-        inner.x,
-        inner.y + 1,
-        inner.width,
-        inner.height.saturating_sub(1),
+    hits.push((
+        Rect::new(
+            inner.x,
+            inner.y + 1,
+            inner.width,
+            inner.height.saturating_sub(1),
+        ),
+        pane,
     ));
 }
 
@@ -322,6 +343,8 @@ fn draw_orgs(f: &mut Frame, app: &mut App, area: Rect) {
     draw_rows(
         f,
         &mut app.hits.rows,
+        Tab::Orgs,
+        None,
         area,
         format!("{title}· {} orgs ", list.len()),
         &["Use", "Alias — username", "Type", "Dev Hub", "Status"],
@@ -420,6 +443,8 @@ fn draw_access(f: &mut Frame, app: &mut App, area: Rect) {
     draw_rows(
         f,
         &mut app.hits.rows,
+        Tab::Access,
+        None,
         area,
         title,
         &header,
@@ -441,8 +466,7 @@ fn draw_access(f: &mut Frame, app: &mut App, area: Rect) {
     );
 }
 
-fn draw_panel(f: &mut Frame, app: &mut App, area: Rect) {
-    let tab = app.tab;
+fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<bool>) {
     let target = app.tab_target(tab).map(|o| o.target().to_owned());
     let mut title = match (tab, &target) {
         (Tab::Packages, Some(t)) => format!(" 2GP packages in {t} "),
@@ -624,6 +648,8 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect) {
     draw_rows(
         f,
         &mut app.hits.rows,
+        tab,
+        focus,
         area,
         title,
         &header,
@@ -646,6 +672,77 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect) {
     );
 }
 
+/// 2GP tab: packages (left) and versions of the selected package (right).
+fn draw_2gp(f: &mut Frame, app: &mut App, area: Rect) {
+    let [left, right] =
+        Layout::horizontal([Constraint::Percentage(34), Constraint::Fill(1)]).areas(area);
+    let focus_left = app.pkg_focus;
+    let hub = app.hub.as_ref().map(|o| o.target().to_owned());
+    let title = match &hub {
+        Some(h) => format!(" Packages in {h} "),
+        None => " Packages ".to_owned(),
+    };
+    let style = if focus_left {
+        Style::new().fg(Color::Cyan)
+    } else {
+        dim()
+    };
+    let simple = |f: &mut Frame, lines: Vec<Line<'static>>| {
+        f.render_widget(
+            Paragraph::new(lines)
+                .block(Block::bordered().title(title.clone()).border_style(style))
+                .wrap(Wrap { trim: false }),
+            left,
+        );
+    };
+    match app.packages.load() {
+        Load::Idle if hub.is_none() => simple(
+            f,
+            vec![Line::from(
+                " No Dev Hub selected. Go to Orgs (2), select a Dev Hub, press h.",
+            )],
+        ),
+        Load::Idle => simple(f, vec![Line::from(" Press r to load.")]),
+        Load::Loading { since, .. } => simple(f, vec![loading_line(since, "Loading packages")]),
+        Load::Failed(fl) => simple(
+            f,
+            failure_lines(fl, hub.as_deref().unwrap_or(""))
+                .into_iter()
+                .map(Line::from)
+                .collect(),
+        ),
+        Load::Ready(d) => {
+            let rows = d.rows.clone();
+            draw_rows(
+                f,
+                &mut app.hits.rows,
+                Tab::Packages,
+                Some(focus_left),
+                left,
+                format!("{title}· {} ", rows.len()),
+                &["Package", "Type"],
+                &[Constraint::Fill(1), Constraint::Length(8)],
+                rows.len() + 1,
+                &mut app.packages.scroll,
+                |i| {
+                    if i == 0 {
+                        return vec![
+                            TCell::from("‹ All packages ›").style(Style::new().italic()),
+                            TCell::from(""),
+                        ];
+                    }
+                    let r = &rows[i - 1];
+                    vec![
+                        TCell::from(cell_text(r, "Name")),
+                        TCell::from(cell_text(r, "ContainerOptions")).style(dim()),
+                    ]
+                },
+            );
+        }
+    }
+    draw_panel(f, app, right, Tab::Versions, Some(!focus_left));
+}
+
 fn draw_log(f: &mut Frame, app: &mut App, area: Rect) {
     let entries: Vec<_> = app.log.iter().rev().cloned().collect();
     if entries.is_empty() {
@@ -659,6 +756,8 @@ fn draw_log(f: &mut Frame, app: &mut App, area: Rect) {
     draw_rows(
         f,
         &mut app.hits.rows,
+        Tab::Log,
+        None,
         area,
         format!(" History — last {} sf calls (newest first) ", entries.len()),
         &["Time UTC", "Exit", "Secs", "Result", "Command"],
@@ -828,9 +927,10 @@ mod tests {
             .iter()
             .map(|c| c.symbol())
             .collect();
-        assert!(text.contains("2GP packages in fake0009"), "{text}");
-        assert!(text.contains("0Ho00000000000jCAA"));
+        assert!(text.contains("Packages in fake0009"), "{text}");
+        assert!(text.contains("All packages"));
+        assert!(text.contains("fake0219"));
         assert_eq!(app.hits.tabs.len(), Tab::ALL.len());
-        assert!(app.hits.rows.is_some());
+        assert!(app.hits.rows.iter().any(|(_, p)| *p == Tab::Packages));
     }
 }

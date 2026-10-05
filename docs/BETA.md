@@ -23,9 +23,11 @@ all keys, `q` quits.
    press `h` (use as Dev Hub) or `o` (use as target org).
 3. **Access**: `a` probes all orgs (`p` just the selected one) and shows what
    each org lets you read; `Enter` on a cell explains the result.
-4. **2GP Packages** → `Enter` on a package → **2GP Versions** (`R` released,
-   `L` latest per package, `V` verbose, `c` copy 04t, `i` copy install link,
-   `Enter` version details).
+4. **2GP Packages & Versions**: packages on the left, versions on the right.
+   Click a package (or move with ↑↓) to show its versions; `‹ All packages ›`
+   shows everything. ←/→ or a click switches pane. Filters: `R` released,
+   `L` latest per package, `V` verbose. On a version: `c` copy 04t,
+   `i` copy install link, `Enter` details.
 5. **Installed** and **1GP Versions** use the selected org.
 6. **History** lists every `sf` call with exit code, time and stderr.
 

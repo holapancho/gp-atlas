@@ -105,6 +105,7 @@ fn run(
         while let Ok(done) = rx.try_recv() {
             app.on_done(done);
         }
+        app.tick();
     }
     Ok(())
 }
