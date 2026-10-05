@@ -14,7 +14,9 @@ error classification and the Access Matrix. Its two jobs:
 
 ## Requirements
 
-- Salesforce CLI **exactly 2.150.6** (`sf version`). Other versions are refused.
+- Salesforce CLI **2.150.6 or newer** (`sf version`). Older versions are refused.
+  On a newer CLI, `doctor` lists any command that changed since 2.150.6; only
+  that command is disabled.
 - macOS (Apple Silicon), Windows x64 or Linux x64.
 
 ## Install
@@ -32,19 +34,79 @@ chmod +x gp-atlas-beta
 ./gp-atlas-beta --help
 ```
 
-**From source (needs Rust):**
+**From source:** see [Build a debug version on another machine](#build-a-debug-version-on-another-machine).
+
+## Build a debug version on another machine
+
+A local debug build needs no signing or quarantine steps, gives readable
+panic backtraces, and lets you rebuild after `git pull`.
+
+**1. Prerequisites (once per machine)**
+
+| OS | Install |
+|---|---|
+| macOS | `xcode-select --install` (C linker), then Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
+| Linux | `build-essential` (or your distro's gcc + make), then Rust with the same `rustup` command |
+| Windows | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with "Desktop development with C++", then Rust from [rustup.rs](https://rustup.rs) (`rustup-init.exe`) |
+
+Plus `git`, Node.js ≥ 22 and `sf` ≥ 2.150.6 (`npm install --global @salesforce/cli@latest`).
+
+**2. Get the code and build**
 
 ```bash
-git clone https://github.com/holapancho/gp-atlas && cd gp-atlas
-cargo build --release -p gp-atlas-cli
-./target/release/gp-atlas-beta --help
+git clone https://github.com/holapancho/gp-atlas
+cd gp-atlas
+rustup toolchain install          # installs the pinned Rust (rust-toolchain.toml)
+cargo build -p gp-atlas-cli       # debug build (default profile)
 ```
+
+The binary is `target/debug/gp-atlas-beta` (`target\debug\gp-atlas-beta.exe`
+on Windows). If the repository is private, clone with an account that has
+access (`gh auth login`, or an SSH key).
+
+**3. Run with debugging on**
+
+```bash
+# macOS / Linux
+RUST_BACKTRACE=1 ./target/debug/gp-atlas-beta --debug doctor
+# or build-and-run in one step
+RUST_BACKTRACE=1 cargo run -p gp-atlas-cli -- --debug orgs
+```
+
+```powershell
+# Windows PowerShell
+$env:RUST_BACKTRACE = "1"
+.\target\debug\gp-atlas-beta.exe --debug doctor
+```
+
+- `--debug` prints every `sf` call (argv, exit code, duration, stderr).
+- `--raw` prints the JSON GP Atlas received instead of a table.
+- `RUST_BACKTRACE=1` adds a full backtrace if the tool panics.
+- `--sf /path/to/sf` (or `GP_ATLAS_SF_BIN`) picks a specific `sf`, handy to
+  compare two CLI versions side by side.
+
+**4. Update later**
+
+```bash
+git pull && cargo build -p gp-atlas-cli
+```
+
+**5. Optional: run the test suite on that machine**
+
+```bash
+cargo test                                            # unit + fake-sf tests, no org needed
+cargo test -p gp-atlas-contract-tests -- --ignored    # needs sf 2.150.6 exactly
+GP_ATLAS_CONTRACT_MODE=compat cargo test -p gp-atlas-contract-tests -- --ignored   # any newer sf
+```
+
+A release (optimized) build is `cargo build --release -p gp-atlas-cli`
+→ `target/release/gp-atlas-beta`.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `gp-atlas-beta doctor` | D1–D4: `sf` found, exact version, bundled packaging plugin, command contract |
+| `gp-atlas-beta doctor` | D1–D4: `sf` found, version ≥ 2.150.6, bundled packaging plugin, command contract (lists commands that changed in a newer CLI) |
 | `gp-atlas-beta orgs` | Your orgs as `alias — username`, type, Dev Hub flag, connection status |
 | `gp-atlas-beta probe` | Access Matrix for all orgs (`--org X` to limit, `--try-anyway` for 2GP on non-hubs, `--details` for raw errors) |
 | `gp-atlas-beta packages --hub X` | 2GP packages in a Dev Hub |

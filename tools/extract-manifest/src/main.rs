@@ -10,12 +10,12 @@
 //! * `--out`    write the manifest here (default: stdout).
 //! * `--check`  do not write; exit 1 if `--out` differs from the generated manifest.
 //!
-//! Refuses to run against any CLI other than `@salesforce/cli/2.150.6`.
+//! The manifest is the 2.150.6 baseline: refuses to run against any other CLI.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 
-use gp_atlas_core::REQUIRED_CLI_VERSION_STRING;
+use gp_atlas_core::BASELINE_CLI_VERSION_STRING;
 use gp_atlas_core::manifest::Manifest;
 use serde_json::Value;
 
@@ -50,13 +50,13 @@ fn run() -> Result<ExitCode, String> {
             let bin = resolve_sf(args.sf.as_deref())?;
             let version = sf_json(&bin, &["version", "--json"])?;
             let found = version.get("cliVersion").and_then(Value::as_str);
-            if found != Some(REQUIRED_CLI_VERSION_STRING) {
+            if found != Some(BASELINE_CLI_VERSION_STRING) {
                 return Err(format!(
-                    "{} reports cliVersion {:?}; expected {REQUIRED_CLI_VERSION_STRING:?}. \
+                    "{} reports cliVersion {:?}; expected {BASELINE_CLI_VERSION_STRING:?}. \
                      Install it with: {}",
                     bin.display(),
                     found.unwrap_or("<missing>"),
-                    gp_atlas_core::CLI_INSTALL_COMMAND
+                    gp_atlas_core::BASELINE_INSTALL_COMMAND
                 ));
             }
             sf_json(&bin, &["commands", "--json"])?
@@ -132,7 +132,7 @@ fn resolve_sf(explicit: Option<&Path>) -> Result<PathBuf, String> {
     which::which("sf").map_err(|e| {
         format!(
             "sf not found on PATH ({e}); install it with: {}",
-            gp_atlas_core::CLI_INSTALL_COMMAND
+            gp_atlas_core::BASELINE_INSTALL_COMMAND
         )
     })
 }

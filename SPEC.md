@@ -1,7 +1,7 @@
 # GP Atlas — Build Spec & Agent Prompt
 
 > **Repo:** <https://github.com/holapancho/gp-atlas>
-> **Target CLI:** Salesforce CLI (`sf`) **2.150.6 — exactly.** It bundles `@salesforce/plugin-packaging` **3.0.6** (a new major; do not trust docs written for 2.x of that plugin).
+> **Target CLI:** Salesforce CLI (`sf`) **2.150.6 or newer** (decision 2026-10-05). **Baseline: 2.150.6**, which bundles `@salesforce/plugin-packaging` **3.0.6** (a new major; do not trust docs written for 2.x of that plugin). The manifest, facts and fixtures describe the baseline; newer versions are accepted command by command through the contract check (D4).
 > **Status:** Spec v1. Every fact in §4 was verified on 2026-10-01 by installing `@salesforce/cli@2.150.6` and reading its own command metadata (`sf commands --json`), its plugin source, and real command output. Anything *not* verified is listed in §4.7 (Known unknowns) — do not guess those; capture a fixture.
 
 ---
@@ -19,12 +19,12 @@ You are a senior Rust engineer building **GP Atlas**: a small, cross-platform de
 **Hard rules — never violate these:**
 
 1. **Read-only.** GP Atlas never executes a state-changing `sf` command. The runner accepts only a closed `ReadOnlyCommand` enum (§4.4). There is no API to run arbitrary arguments.
-2. **`sf` 2.150.6 only.** No feature may depend on behaviour of any other version. If `sf version` ≠ 2.150.6, block with a clear message (§4.2). Never invent a flag, command, JSON field or error code: use the manifest (§4.4) and fixtures; if unknown, add it to §4.7 and capture a real fixture.
+2. **`sf` 2.150.6 or newer.** The baseline is 2.150.6: the manifest, facts and fixtures come from it. Older versions are blocked with a clear message (§4.2). On a newer version, any allow-listed command whose flags differ from the baseline manifest is disabled individually (D4, `ContractDrift`); everything else runs. Behaviour differences found in newer versions are recorded as facts/fixtures for that version. Never invent a flag, command, JSON field or error code: use the manifest (§4.4) and fixtures; if unknown, add it to §4.7 and capture a real fixture.
 3. **No shell.** Spawn `sf` with an argv vector (`Command::new(bin).args(..)`). Never build a command string for execution. Quoting exists only for the *copy-to-clipboard* feature (§9).
 4. **Validate, don't escape.** Every user-supplied value is validated against a per-flag pattern before it can reach argv. Reject invalid values; do not try to sanitize them.
 5. **No secrets.** Never call `sf org display`, never read auth files directly, never persist or log tokens or installation keys (§10).
 6. **UI never blocks.** All `sf` calls run off the UI thread, have timeouts, are cancellable, and show progress (§7).
-7. **Evidence over memory.** Tests use fixtures captured from the real CLI. Contract tests install exactly `@salesforce/cli@2.150.6` (§11).
+7. **Evidence over memory.** Tests use fixtures captured from the real CLI. Contract tests install exactly `@salesforce/cli@2.150.6` (baseline) and, non-blocking, the latest release (§11).
 8. **Small, reviewable steps.** One milestone per PR. After each: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, and the contract test must pass. Summarize what changed and which acceptance criteria (AC) were met.
 
 **Interpretation notes (decisions already made — don't re-litigate):**
@@ -74,23 +74,25 @@ Salesforce developers constantly need to answer small packaging questions: *What
 
 ---
 
-## 4. Platform contract: `sf` 2.150.6
+## 4. Platform contract: `sf` 2.150.6 (baseline) or newer
 
-### 4.1 Pin and install
+### 4.1 Install
 
 ```bash
 # Node >= 22 is required by @salesforce/cli@2.150.6 (npm "engines" field)
-npm install --global @salesforce/cli@2.150.6
+npm install --global @salesforce/cli@latest   # any version >= 2.150.6
+npm install --global @salesforce/cli@2.150.6  # the baseline (manifest regeneration, contract tests)
 sf version --json        # -> "cliVersion": "@salesforce/cli/2.150.6"
 ```
 
 Binary resolution order: `GP_ATLAS_SF_BIN` env var → setting in app config → `which sf` (use the `which` crate so Windows resolves `sf.cmd`).
 
-### 4.2 Version gate (exact match)
+### 4.2 Version gate (minimum 2.150.6)
 
-- `sf version --json` → `cliVersion` must equal `@salesforce/cli/2.150.6`.
-- Mismatch → state `CliVersionMismatch { found }`. **All `sf` features are disabled** except Doctor, with a copyable fix: `npm install --global @salesforce/cli@2.150.6`.
-- Developer-only override: `--allow-cli-version <ver>` flag or `GP_ATLAS_ALLOW_CLI_VERSION`. When active, show a persistent red banner "Unsupported CLI version — results may be wrong".
+- `sf version --json` → `cliVersion` must be **≥ 2.150.6**, compared numerically as `major.minor.patch` (a pre-release such as `2.150.6-rc.1` is older than `2.150.6`).
+- Older or unparsable → state `CliVersionTooOld { found }`. **All `sf` features are disabled** except Doctor, with a copyable fix: `npm install --global @salesforce/cli@latest`.
+- Newer than the baseline → run D4 against the live `sf commands --json`; commands with drift are disabled and listed, the rest work normally.
+- Developer-only override (for an **older** version): `--allow-cli-version <ver>` flag or `GP_ATLAS_ALLOW_CLI_VERSION`. When active, show a persistent red banner "Unsupported CLI version — results may be wrong".
 
 ### 4.3 Verified facts (clean install, linux-x64, Node 22.22.2)
 
@@ -132,6 +134,7 @@ Binary resolution order: `GP_ATLAS_SF_BIN` env var → setting in app config →
 | F34 | `package1 version create get --json` returns the `PackageUploadRequest` record, which can contain **`Password`** (the 1GP installation key). `Status` is `QUEUED`/`IN_PROGRESS`/`SUCCESS`/`ERROR`; on `ERROR` the command **fails** (`uploadFailure`) instead of returning the record. | Installed `lib/commands/package1/version/create/get.js`; schema `package1-version-create-get.json`. |
 | F35 | `@salesforce/plugin-packaging` 3.0.6 ships **JSON Schemas** for every command result in `schemas/` (inside the installed CLI). They describe types, not runtime behaviour, and can be wrong in details (F30). | Installed package. |
 | F36 | Real `org list --json` (48 orgs): every org object has `username, accessToken (redacted text), instanceUrl, orgId, loginUrl, clientId, instanceApiVersion, instanceApiVersionLastRetrieved (locale string, e.g. "9/30/2026, 4:08:45 PM"), isDevHub, namespacePrefix (string or null), name, instanceName, isSandbox, isScratch, trailExpirationDate (ISO "…+0000" or null), orgEdition, alias (may be null), isDefaultDevHubUsername, isDefaultUsername, lastUsed (ISO)`; `tracksSource` is sometimes absent. Non-scratch orgs add `connectedStatus` and (only when default) `defaultMarker`. **`connectedStatus` is free text**: `"Connected"` or an error message, observed: `"Session expired or invalid"`, `"Unable to refresh session due to: Error authenticating with the refresh token due to: authentication failure"`, and a multi-line HTML/HTTP 420 error. Scratch orgs have **no** `connectedStatus`; they add `devHubUsername, created (epoch ms as a string), expirationDate ("YYYY-MM-DD"), createdOrgInstance, signupUsername, createdBy (a username), createdDate (ISO), devHubOrgId, devHubId, attributes, orgName, edition, status ("Active"), isExpired, namespace`. `loginUrl` may or may not have a trailing `/`. | Owner's capture `fixtures/sf-2.150.6/org-list.real.json`. |
+| F37 | `@salesforce/cli` **2.152.14** (latest on 2026-10-05) bundles `@salesforce/plugin-packaging` **3.0.7**; all 18 manifest commands match the 2.150.6 baseline (no D4 drift). | Contract tests in compat mode against a clean install. |
 
 ### 4.4 Command manifest (allow-list)
 
@@ -224,8 +227,8 @@ Exact key sets and value rules per command are in F27–F30 and F33–F34; the l
 | # | Check | Command | Pass condition |
 |---|-------|---------|----------------|
 | D1 | `sf` found and runnable | resolve binary; run `sf version --json` | exit 0, JSON parses |
-| D2 | **Exact CLI version** | `sf version --json` | `cliVersion == "@salesforce/cli/2.150.6"` (§4.2) |
-| D3 | Packaging plugin is the bundled one | `sf plugins --json` | an entry `name == "@salesforce/plugin-packaging"`, `version == "3.0.6"`, `type == "core"`. Any other type/version → `PackagingPluginOverridden` (F23) |
+| D2 | **CLI version ≥ 2.150.6** | `sf version --json` | `cliVersion` ≥ `2.150.6` (§4.2) |
+| D3 | Packaging plugin is the bundled one | `sf plugins --json` | exactly one entry `name == "@salesforce/plugin-packaging"` with `type == "core"` (any version; a version other than the 3.0.6 baseline is noted and covered by D4). `user`/`link`/other type → `PackagingPluginOverridden` (F23, F31) |
 | D4 | **Contract**: every allow-listed command and flag exists as the manifest says | `sf commands --json` vs `manifest/sf-2.150.6.json` | all ids present; for each flag: name, type, `char`, `required`, `options` equal. Mismatch → `ContractDrift` for that command only |
 
 **L1 — Inventory**
@@ -429,7 +432,7 @@ Top bar: **CLI pill** (✅ 2.150.6 / ⛔ mismatch), **Dev Hub selector**, **Pack
 
 1. **Unit:** validators, `argv()` for every variant (golden tests), quoting tables, alias join (15/18-char), classifier (§5.3), "latest released" computation, lenient parsers on fixtures.
 2. **Fake `sf`:** `tests/fake-sf` is a small executable that replays fixtures keyed by argv; set via `GP_ATLAS_SF_BIN`. Integration tests drive the core through it (success, empty, each error class, timeout, huge output).
-3. **Contract (CI job `sf-contract`):** Node 22 → `npm i -g @salesforce/cli@2.150.6` → assert `sf version` → run `tools/extract-manifest` → `git diff --exit-code manifest/sf-2.150.6.json`. Also run a test that asserts no runnable variant maps to a blocklisted command.
+3. **Contract (CI job `sf-contract`):** Node 22 → `npm i -g @salesforce/cli@2.150.6` → assert `sf version` → run `tools/extract-manifest` → `git diff --exit-code manifest/sf-2.150.6.json`. Also run a test that asserts no runnable variant maps to a blocklisted command. A second, non-blocking job `sf-latest` installs `@salesforce/cli@latest` and runs the same tests with `GP_ATLAS_CONTRACT_MODE=compat` (version gate, bundled plugin, no D4 drift against the baseline manifest).
 4. **Fixtures:** `tools/capture-fixtures` runs every runnable command against a real Dev Hub and a real packaging org with `--json`, then sanitizes (usernames, org IDs, instance URLs, record IDs → deterministic fakes). Capture the cases in §4.7 (U1–U7).
 5. **Cross-platform CI:** ubuntu, macos, windows (Windows job must exercise spawning `sf.cmd`).
 6. **Manual UI checklist** per release: Doctor red/green, Access Matrix with a denied org, 10k-row table scroll, cancel during load, copy in all three shells, alias chip warnings.
@@ -461,9 +464,9 @@ Each milestone ends with a PR; list the ACs met in the PR description.
 - **AC-02** `sf-contract` job installs `@salesforce/cli@2.150.6` and the generated manifest equals the committed one.
 
 **CLI contract & Doctor**
-- **AC-03** With `sf` 2.150.6 present, Doctor shows D1–D4 green within 8 s of launch on a typical machine.
-- **AC-04** With any other `sf` version, every `sf` feature is disabled, a banner shows found vs required, and the fix command is copyable.
-- **AC-05** If `@salesforce/plugin-packaging` is not `core` or not `3.0.6`, state is `PackagingPluginOverridden` with an explanation.
+- **AC-03** With `sf` 2.150.6 or newer present, Doctor shows D1–D4 green within 8 s of launch on a typical machine.
+- **AC-04** With an `sf` older than 2.150.6, every `sf` feature is disabled, a banner shows found vs minimum, and the fix command is copyable. With a newer `sf`, only commands with contract drift are disabled.
+- **AC-05** If `@salesforce/plugin-packaging` is not the bundled (`core`) plugin, state is `PackagingPluginOverridden` with an explanation.
 - **AC-06** If a manifest flag is missing/changed in `sf commands --json`, only the affected command is disabled and the diff is shown.
 - **AC-07** `sf` missing from PATH → clear `CliMissing` state with install instructions; no crash.
 - **AC-08** A property test proves `ReadOnlyCommand::argv()` never emits a blocklisted command or a deprecated flag alias.

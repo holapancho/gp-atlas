@@ -16,16 +16,22 @@ pub mod probes;
 pub mod runner;
 pub mod versions;
 
-/// The only Salesforce CLI version GP Atlas supports (SPEC §4.2).
-pub const REQUIRED_CLI_VERSION: &str = "2.150.6";
+pub mod cli_version;
 
-/// `cliVersion` as reported by `sf version --json` for [`REQUIRED_CLI_VERSION`] (F1).
-pub const REQUIRED_CLI_VERSION_STRING: &str = "@salesforce/cli/2.150.6";
+/// Oldest supported Salesforce CLI version (SPEC §4.2). Newer versions are
+/// accepted; per-command contract drift (D4) disables only affected commands.
+pub const MIN_CLI_VERSION: &str = "2.150.6";
 
-/// The packaging plugin bundled with `sf` 2.150.6 (F2, D3).
+/// The CLI version the manifest and fixtures are generated from (baseline).
+pub const BASELINE_CLI_VERSION_STRING: &str = "@salesforce/cli/2.150.6";
+
+/// The packaging plugin (F2, D3).
 pub const PACKAGING_PLUGIN_NAME: &str = "@salesforce/plugin-packaging";
-/// Version of [`PACKAGING_PLUGIN_NAME`] bundled with `sf` 2.150.6 (F2, D3).
-pub const PACKAGING_PLUGIN_VERSION: &str = "3.0.6";
+/// Version of [`PACKAGING_PLUGIN_NAME`] bundled with the baseline CLI (F2).
+pub const PACKAGING_PLUGIN_BASELINE_VERSION: &str = "3.0.6";
 
-/// Install command shown as the fix for a missing or mismatched CLI (§4.2).
-pub const CLI_INSTALL_COMMAND: &str = "npm install --global @salesforce/cli@2.150.6";
+/// Fix shown for a missing or too-old CLI (§4.2).
+pub const CLI_INSTALL_COMMAND: &str = "npm install --global @salesforce/cli@latest";
+
+/// Installs the baseline CLI (manifest regeneration, contract tests).
+pub const BASELINE_INSTALL_COMMAND: &str = "npm install --global @salesforce/cli@2.150.6";

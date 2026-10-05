@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::REQUIRED_CLI_VERSION_STRING;
+use crate::BASELINE_CLI_VERSION_STRING;
 
 /// Version of the manifest file format.
 pub const MANIFEST_SCHEMA: u32 = 1;
@@ -142,7 +142,7 @@ impl Manifest {
         commands.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(Self {
             schema: MANIFEST_SCHEMA,
-            cli_version: REQUIRED_CLI_VERSION_STRING.to_owned(),
+            cli_version: BASELINE_CLI_VERSION_STRING.to_owned(),
             generated_by: "tools/extract-manifest (from `sf commands --json`)".to_owned(),
             commands,
         })
@@ -276,7 +276,7 @@ mod tests {
     fn embedded_manifest_matches_pinned_version() {
         let m = embedded();
         assert_eq!(m.schema, MANIFEST_SCHEMA);
-        assert_eq!(m.cli_version, REQUIRED_CLI_VERSION_STRING);
+        assert_eq!(m.cli_version, BASELINE_CLI_VERSION_STRING);
     }
 
     #[test]

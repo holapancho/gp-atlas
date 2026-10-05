@@ -1,11 +1,11 @@
 //! `gp-atlas` binary. The egui frontend arrives in M1 (SPEC §12); for now this
 //! only reports the pinned CLI contract.
 
-use gp_atlas_core::{REQUIRED_CLI_VERSION, manifest::Manifest};
+use gp_atlas_core::{MIN_CLI_VERSION, manifest::Manifest};
 
 fn main() -> std::process::ExitCode {
     println!("gp-atlas {}", env!("CARGO_PKG_VERSION"));
-    println!("Requires Salesforce CLI (sf) {REQUIRED_CLI_VERSION} exactly.");
+    println!("Requires Salesforce CLI (sf) {MIN_CLI_VERSION} or newer.");
     match Manifest::embedded() {
         Ok(m) => {
             println!(

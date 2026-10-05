@@ -2,11 +2,12 @@
 
 use serde_json::Value;
 
+use crate::cli_version::CliVersion;
 use crate::command::ReadOnlyCommand;
 use crate::envelope::{self, SfOutput};
 use crate::manifest::{CommandSpec, Manifest};
 use crate::runner::{RunOutput, SfRunner};
-use crate::{PACKAGING_PLUGIN_NAME, PACKAGING_PLUGIN_VERSION, REQUIRED_CLI_VERSION_STRING};
+use crate::{MIN_CLI_VERSION, PACKAGING_PLUGIN_BASELINE_VERSION, PACKAGING_PLUGIN_NAME};
 
 /// Outcome of one check.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,38 +55,43 @@ impl DoctorReport {
         .all(|c| c.is_pass())
     }
 
-    /// Version gate (§4.2): sf features are enabled only for the pinned version,
-    /// or for an explicitly allowed one (developer override).
+    /// Version gate (§4.2): sf features are enabled for 2.150.6 or newer, or
+    /// for an explicitly allowed older version (developer override).
     pub fn version_allowed(&self, allow: Option<&str>) -> bool {
-        match &self.found_version {
-            Some(v) if v == REQUIRED_CLI_VERSION_STRING => true,
-            Some(v) => allow.is_some_and(|a| v == a || v.ends_with(&format!("/{a}"))),
-            None => false,
-        }
+        version_allowed(self.found_version.as_deref(), allow)
     }
 }
 
-/// D2: `cliVersion` from `sf version --json`.
+/// Version gate (§4.2) for a `cliVersion` string.
+pub fn version_allowed(found: Option<&str>, allow: Option<&str>) -> bool {
+    let Some(found) = found else { return false };
+    if CliVersion::parse(found).is_some_and(|v| v.is_supported()) {
+        return true;
+    }
+    allow.is_some_and(|a| found == a || found.ends_with(&format!("/{a}")))
+}
+
+/// D2: `cliVersion` from `sf version --json` must be 2.150.6 or newer.
 pub fn check_version(out: &Value) -> (Check, Option<String>) {
-    match out.get("cliVersion").and_then(Value::as_str) {
-        Some(v) if v == REQUIRED_CLI_VERSION_STRING => {
-            (Check::Pass(v.to_owned()), Some(v.to_owned()))
-        }
-        Some(v) => (
-            Check::Fail(format!(
-                "found {v}, required {REQUIRED_CLI_VERSION_STRING}. Fix: {}",
-                crate::CLI_INSTALL_COMMAND
-            )),
-            Some(v.to_owned()),
-        ),
-        None => (
+    let Some(found) = out.get("cliVersion").and_then(Value::as_str) else {
+        return (
             Check::Fail("no cliVersion in `sf version --json`".into()),
             None,
-        ),
-    }
+        );
+    };
+    let check = match CliVersion::parse(found) {
+        Some(v) if v.is_supported() => Check::Pass(format!("{found} (≥ {MIN_CLI_VERSION})")),
+        Some(_) => Check::Fail(format!(
+            "CliVersionTooOld: found {found}, need {MIN_CLI_VERSION} or newer. Fix: {}",
+            crate::CLI_INSTALL_COMMAND
+        )),
+        None => Check::Fail(format!("cannot parse cliVersion {found:?}")),
+    };
+    (check, Some(found.to_owned()))
 }
 
-/// D3: the packaging plugin must be the bundled core one (F23, F31).
+/// D3: the packaging plugin must be the one bundled with the CLI (F23, F31).
+/// Any bundled version passes; newer ones are checked command by command (D4).
 pub fn check_packaging_plugin(plugins: &Value) -> Check {
     let Some(list) = plugins.as_array() else {
         return Check::Fail("`sf plugins --json` is not an array".into());
@@ -99,13 +105,18 @@ pub fn check_packaging_plugin(plugins: &Value) -> Check {
     };
     let version = p.get("version").and_then(Value::as_str).unwrap_or("?");
     let kind = p.get("type").and_then(Value::as_str).unwrap_or("?");
-    if version == PACKAGING_PLUGIN_VERSION && kind == "core" && entries.len() == 1 {
-        Check::Pass(format!("{PACKAGING_PLUGIN_NAME} {version} ({kind})"))
+    if kind == "core" && entries.len() == 1 {
+        let note = if version == PACKAGING_PLUGIN_BASELINE_VERSION {
+            String::new()
+        } else {
+            format!(" — newer than the {PACKAGING_PLUGIN_BASELINE_VERSION} baseline; see D4")
+        };
+        Check::Pass(format!("{PACKAGING_PLUGIN_NAME} {version} ({kind}){note}"))
     } else {
         Check::Fail(format!(
             "PackagingPluginOverridden: found {PACKAGING_PLUGIN_NAME} {version} (type {kind}); \
-             expected {PACKAGING_PLUGIN_VERSION} (core). A user-installed or linked plugin replaces \
-             the bundled one. Fix: sf plugins uninstall {PACKAGING_PLUGIN_NAME}"
+             expected the version bundled with the CLI (type core). A user-installed or linked \
+             plugin replaces the bundled one. Fix: sf plugins uninstall {PACKAGING_PLUGIN_NAME}"
         ))
     }
 }
@@ -272,8 +283,17 @@ mod tests {
     fn version_gate() {
         assert!(check_version(&fixture("version.json")).0.is_pass());
         let (c, found) = check_version(&json!({"cliVersion": "@salesforce/cli/2.152.14"}));
-        assert!(!c.is_pass());
+        assert!(c.is_pass(), "newer is supported: {c:?}");
         assert_eq!(found.as_deref(), Some("@salesforce/cli/2.152.14"));
+        let (c, _) = check_version(&json!({"cliVersion": "@salesforce/cli/2.149.0"}));
+        assert!(matches!(c, Check::Fail(m) if m.contains("CliVersionTooOld")));
+        assert!(!check_version(&json!({"cliVersion": "garbage"})).0.is_pass());
+        assert!(version_allowed(Some("@salesforce/cli/2.200.0"), None));
+        assert!(!version_allowed(Some("@salesforce/cli/2.149.0"), None));
+        assert!(version_allowed(
+            Some("@salesforce/cli/2.149.0"),
+            Some("2.149.0")
+        ));
     }
 
     #[test]
@@ -285,6 +305,8 @@ mod tests {
         );
         let link = json!([{"name": PACKAGING_PLUGIN_NAME, "version": "3.0.6", "type": "link"}]);
         assert!(!check_packaging_plugin(&link).is_pass());
+        let newer = json!([{"name": PACKAGING_PLUGIN_NAME, "version": "3.2.0", "type": "core"}]);
+        assert!(matches!(check_packaging_plugin(&newer), Check::Pass(m) if m.contains("see D4")));
     }
 
     #[test]

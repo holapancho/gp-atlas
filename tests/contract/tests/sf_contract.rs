@@ -1,14 +1,27 @@
-//! Contract tests against a real `sf` (SPEC §11.3). Ignored by default; the
-//! `sf-contract` CI job runs them with `--ignored` after installing exactly
-//! `@salesforce/cli@2.150.6`. The sf binary is `$GP_ATLAS_SF_BIN` or `sf` on PATH.
+//! Contract tests against a real `sf` (SPEC §11.3). Ignored by default; CI runs
+//! them with `--ignored`. The sf binary is `$GP_ATLAS_SF_BIN` or `sf` on PATH.
+//!
+//! `GP_ATLAS_CONTRACT_MODE`:
+//! * `baseline` (default) — `sf` must be exactly 2.150.6 and match the
+//!   committed manifest byte for byte (job `sf-contract`).
+//! * `compat` — any supported newer `sf`: the version gate passes, the
+//!   packaging plugin is the bundled one, and no allow-listed command drifted
+//!   (job `sf-latest`).
 
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use gp_atlas_core::blocklist::is_blocked_command;
+use gp_atlas_core::doctor::{check_contract, check_packaging_plugin, check_version};
 use gp_atlas_core::manifest::Manifest;
-use gp_atlas_core::{PACKAGING_PLUGIN_NAME, PACKAGING_PLUGIN_VERSION, REQUIRED_CLI_VERSION_STRING};
+use gp_atlas_core::{
+    BASELINE_CLI_VERSION_STRING, PACKAGING_PLUGIN_BASELINE_VERSION, PACKAGING_PLUGIN_NAME,
+};
 use serde_json::Value;
+
+fn compat() -> bool {
+    std::env::var("GP_ATLAS_CONTRACT_MODE").as_deref() == Ok("compat")
+}
 
 fn sf_bin() -> PathBuf {
     std::env::var_os("GP_ATLAS_SF_BIN")
@@ -31,37 +44,55 @@ fn sf_json(argv: &[&str]) -> Value {
 }
 
 #[test]
-#[ignore = "needs sf 2.150.6; run in the sf-contract CI job"]
-fn cli_version_is_pinned() {
+#[ignore = "needs a real sf; run in the sf-contract / sf-latest CI jobs"]
+fn cli_version() {
     let v = sf_json(&["version", "--json"]);
-    assert_eq!(v["cliVersion"], REQUIRED_CLI_VERSION_STRING);
+    if compat() {
+        let (check, found) = check_version(&v);
+        assert!(check.is_pass(), "{check:?}");
+        eprintln!("compat run against {}", found.unwrap_or_default());
+    } else {
+        assert_eq!(v["cliVersion"], BASELINE_CLI_VERSION_STRING);
+    }
 }
 
 #[test]
-#[ignore = "needs sf 2.150.6; run in the sf-contract CI job"]
+#[ignore = "needs a real sf; run in the sf-contract / sf-latest CI jobs"]
 fn packaging_plugin_is_bundled_core() {
     // F3: bare array; D3: bundled packaging plugin.
     let v = sf_json(&["plugins", "--json"]);
-    let p = v
-        .as_array()
-        .expect("bare array")
-        .iter()
-        .find(|p| p["name"] == PACKAGING_PLUGIN_NAME)
-        .expect("packaging plugin listed");
-    assert_eq!(p["version"], PACKAGING_PLUGIN_VERSION);
-    assert_eq!(p["type"], "core");
+    let check = check_packaging_plugin(&v);
+    assert!(check.is_pass(), "{check:?}");
+    if !compat() {
+        let p = v
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"] == PACKAGING_PLUGIN_NAME)
+            .unwrap();
+        assert_eq!(p["version"], PACKAGING_PLUGIN_BASELINE_VERSION);
+    }
 }
 
 #[test]
-#[ignore = "needs sf 2.150.6; run in the sf-contract CI job"]
+#[ignore = "needs a real sf; run in the sf-contract / sf-latest CI jobs"]
 fn live_commands_match_committed_manifest() {
-    let live = Manifest::extract(&sf_json(&["commands", "--json"])).expect("extract");
+    let live_json = sf_json(&["commands", "--json"]);
     let committed = Manifest::embedded().expect("committed manifest");
-    assert_eq!(live, committed);
+    if compat() {
+        let (check, drift) = check_contract(&live_json, &committed);
+        assert!(
+            check.is_pass(),
+            "commands drifted from the 2.150.6 baseline (GP Atlas disables them): {drift:#?}"
+        );
+    } else {
+        let live = Manifest::extract(&live_json).expect("extract");
+        assert_eq!(live, committed);
+    }
 }
 
 #[test]
-#[ignore = "needs sf 2.150.6; run in the sf-contract CI job"]
+#[ignore = "needs a real sf; run in the sf-contract / sf-latest CI jobs"]
 fn blocklist_covers_real_mutating_commands() {
     // The ids the blocklist is written against must exist in the real CLI,
     // otherwise the rule silently protects nothing.

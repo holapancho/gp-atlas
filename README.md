@@ -29,14 +29,16 @@ never runs `sf org display`, and never stores tokens or installation keys.
 
 ## Requirements
 
-GP Atlas supports **exactly one** Salesforce CLI version: **`@salesforce/cli` 2.150.6**
-(bundling `@salesforce/plugin-packaging` 3.0.6). Any other version is
-rejected, because flags, JSON output and error shapes change between releases.
+GP Atlas requires **`@salesforce/cli` 2.150.6 or newer**. Older versions are
+rejected. 2.150.6 is the *baseline*: the command manifest and test fixtures are
+generated from it. On a newer CLI, GP Atlas compares each command it uses with
+the baseline and disables only a command whose flags changed (Doctor shows
+which). CI also checks the latest CLI release against the baseline.
 
 ```bash
-# Node.js >= 22 is required by @salesforce/cli@2.150.6
-npm install --global @salesforce/cli@2.150.6
-sf version --json   # "cliVersion": "@salesforce/cli/2.150.6"
+# Node.js >= 22
+npm install --global @salesforce/cli@latest
+sf version --json   # "cliVersion" must be @salesforce/cli/2.150.6 or newer
 ```
 
 GP Atlas locates `sf` via the `GP_ATLAS_SF_BIN` environment variable, then the
@@ -61,10 +63,10 @@ cargo test
 | `crates/gp-atlas-cli` | `gp-atlas-beta`: command-line debug frontend and sanitized fixture capture ([docs/BETA.md](docs/BETA.md)). |
 | `crates/gp-atlas-egui` | The `gp-atlas` desktop binary (egui UI, not started yet). |
 | `manifest/sf-2.150.6.json` | **Generated** from `sf commands --json`. Never edit it by hand. |
-| `tools/extract-manifest` | Regenerates the manifest from an installed `sf` 2.150.6. |
+| `tools/extract-manifest` | Regenerates the baseline manifest from an installed `sf` 2.150.6. |
 | `fixtures/sf-2.150.6/` | Sanitized real `sf` outputs used by tests. |
 | `tests/fake-sf` | Test double for `sf` that replays fixtures by argv. |
-| `tests/contract` | Contract tests against a real `sf` 2.150.6 (CI job `sf-contract`). |
+| `tests/contract` | Contract tests against a real `sf`: the 2.150.6 baseline (CI job `sf-contract`) and the latest release (`sf-latest`, `GP_ATLAS_CONTRACT_MODE=compat`). |
 
 ### Regenerating the manifest
 
@@ -79,7 +81,8 @@ manifest and fails if it differs from the committed copy.
 ### Contract tests
 
 ```bash
-cargo test -p gp-atlas-contract-tests -- --ignored   # needs sf 2.150.6 on PATH or GP_ATLAS_SF_BIN
+cargo test -p gp-atlas-contract-tests -- --ignored   # baseline: needs sf 2.150.6 on PATH or GP_ATLAS_SF_BIN
+GP_ATLAS_CONTRACT_MODE=compat cargo test -p gp-atlas-contract-tests -- --ignored   # any newer sf
 ```
 
 ### Using the fake `sf`

@@ -33,7 +33,7 @@ jobs:
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
 
-  # SPEC §11.3: the manifest must equal what sf 2.150.6 itself reports.
+  # SPEC §11.3: the manifest must equal what the 2.150.6 baseline reports.
   sf-contract:
     name: sf-contract (@salesforce/cli@2.150.6)
     runs-on: ubuntu-latest
@@ -64,6 +64,32 @@ jobs:
         run: git diff --exit-code manifest/sf-2.150.6.json
       - name: Contract tests (version, plugin, manifest, blocklist)
         run: cargo test --locked -p gp-atlas-contract-tests -- --ignored
+
+  # GP Atlas accepts sf 2.150.6 or newer. This job checks the latest release
+  # against the 2.150.6 baseline manifest. Drift is not fatal for users (only
+  # the drifted command is disabled), so the job only warns.
+  sf-latest:
+    name: sf-latest (compatibility, non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      SF_DISABLE_TELEMETRY: "true"
+      SF_SKIP_NEW_VERSION_CHECK: "true"
+      SF_AUTOUPDATE_DISABLE: "true"
+      GP_ATLAS_CONTRACT_MODE: compat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install latest sf
+        run: npm install --global @salesforce/cli@latest
+      - run: sf version --json
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: Contract tests in compatibility mode
+        run: cargo test --locked -p gp-atlas-contract-tests -- --ignored --nocapture
 
   deny:
     name: cargo deny

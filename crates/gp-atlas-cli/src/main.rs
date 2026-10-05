@@ -42,7 +42,7 @@ use gp_atlas_core::manifest::Manifest;
 use gp_atlas_core::orgs::{self, Org};
 use gp_atlas_core::probes::{Capability, org_ref};
 use gp_atlas_core::runner::{RunOutput, RunnerConfig, SfRunner, resolve_sf_bin};
-use gp_atlas_core::{REQUIRED_CLI_VERSION_STRING, versions};
+use gp_atlas_core::{BASELINE_CLI_VERSION_STRING, MIN_CLI_VERSION, versions};
 use serde_json::Value;
 
 use crate::table::Table;
@@ -54,7 +54,7 @@ use crate::table::Table;
     about = "GP Atlas beta: browse 1GP/2GP package versions through your installed sf (read-only).",
     long_about = "GP Atlas beta (debug build). Read-only companion to the Salesforce CLI.\n\
                   Not affiliated with or endorsed by Salesforce.\n\
-                  Requires @salesforce/cli 2.150.6 exactly."
+                  Requires @salesforce/cli 2.150.6 or newer."
 )]
 struct Cli {
     /// Path to the sf binary (default: $GP_ATLAS_SF_BIN, then `sf` on PATH).
@@ -198,6 +198,8 @@ pub struct Ctx {
     pub debug: bool,
     pub raw: bool,
     pub allow: Option<String>,
+    /// Commands disabled by contract drift on a newer CLI (D4), `package version list` form.
+    pub drifted: Mutex<Vec<String>>,
     log: Mutex<()>,
 }
 
@@ -208,6 +210,12 @@ impl Ctx {
         cmd: &ReadOnlyCommand,
         cwd: Option<&std::path::Path>,
     ) -> Result<RunOutput, String> {
+        let words = cmd.id().replace(':', " ");
+        if self.drifted.lock().unwrap().contains(&words) {
+            return Err(format!(
+                "ContractDrift: `sf {words}` changed in this CLI version and is disabled (run `doctor`)"
+            ));
+        }
         let out = self
             .runner
             .run(cmd, &self.manifest, cwd, None)
@@ -294,23 +302,46 @@ fn gate(ctx: &Ctx) -> Result<(), ExitCode> {
             return Err(ExitCode::from(3));
         }
     };
-    let (check, found) = doctor::check_version(&v);
-    if check.is_pass() {
-        return Ok(());
-    }
+    let (_, found) = doctor::check_version(&v);
     let found = found.unwrap_or_default();
-    if let Some(allow) = &ctx.allow
-        && (found == *allow || found.ends_with(&format!("/{allow}")))
-    {
-        eprintln!("⚠ Unsupported CLI version {found} — results may be wrong (override active).");
-        return Ok(());
+    if !doctor::version_allowed(Some(&found), ctx.allow.as_deref()) {
+        eprintln!("✗ CliVersionTooOld: found {found}, need {MIN_CLI_VERSION} or newer.");
+        eprintln!(
+            "  All sf features are disabled. Fix: {}",
+            gp_atlas_core::CLI_INSTALL_COMMAND
+        );
+        return Err(ExitCode::from(3));
     }
-    eprintln!("✗ CliVersionMismatch: found {found}, required {REQUIRED_CLI_VERSION_STRING}.");
-    eprintln!(
-        "  All sf features are disabled. Fix: {}",
-        gp_atlas_core::CLI_INSTALL_COMMAND
-    );
-    Err(ExitCode::from(3))
+    let supported =
+        gp_atlas_core::cli_version::CliVersion::parse(&found).is_some_and(|v| v.is_supported());
+    if !supported {
+        eprintln!("⚠ Unsupported CLI version {found} — results may be wrong (override active).");
+    }
+    if found != BASELINE_CLI_VERSION_STRING {
+        // Newer than the manifest baseline: disable only commands whose flags changed (D4).
+        let out = ctx.run(&ReadOnlyCommand::Commands, None).map_err(|e| {
+            eprintln!("✗ cannot run `sf commands --json`: {e}");
+            ExitCode::from(3)
+        })?;
+        match envelope::parse(&out.stdout) {
+            Ok(SfOutput::Bare(cmds)) => {
+                let (_, drift) = doctor::check_contract(&cmds, &ctx.manifest);
+                for d in &drift {
+                    eprintln!(
+                        "⚠ `sf {}` changed in {found} and is disabled: {}",
+                        d.command,
+                        d.details.join("; ")
+                    );
+                }
+                *ctx.drifted.lock().unwrap() = drift.into_iter().map(|d| d.command).collect();
+            }
+            _ => {
+                eprintln!("✗ `sf commands --json` did not return a JSON array");
+                return Err(ExitCode::from(3));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn main() -> ExitCode {
@@ -337,6 +368,7 @@ fn main() -> ExitCode {
         debug: cli.debug,
         raw: cli.raw,
         allow: cli.allow_cli_version.clone(),
+        drifted: Mutex::new(Vec::new()),
         log: Mutex::new(()),
     };
     if cli.debug {
@@ -531,7 +563,7 @@ fn cmd_doctor(ctx: &Ctx) -> Result<(), ExitCode> {
         }
     }
     check_line("D1 sf runnable", &r.d1_runnable);
-    check_line("D2 exact CLI version", &r.d2_version);
+    check_line("D2 CLI version ≥ 2.150.6", &r.d2_version);
     check_line("D3 bundled packaging plugin", &r.d3_packaging_plugin);
     check_line("D4 command contract", &r.d4_contract);
     for d in &r.drift {
