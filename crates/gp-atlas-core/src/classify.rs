@@ -17,6 +17,10 @@ pub enum UnreachableReason {
     NotAuthenticated,
     SessionExpired,
     Network,
+    /// Salesforce answered with an HTML page (HTTP 420): the org no longer
+    /// exists or its domain changed (deleted scratch org, expired trial,
+    /// refreshed sandbox). Observed: `ERROR_HTTP_420` (F38).
+    OrgUnavailable,
 }
 
 /// Why the state is unknown.
@@ -61,6 +65,10 @@ impl CapState {
             Self::Denied(DenyReason::InsufficientAccess) => "Your user lacks access to this object. Ask an admin.".into(),
             Self::Denied(DenyReason::ApiDisabled) => "API access is disabled for this org/user.".into(),
             Self::Unreachable(UnreachableReason::Network) => "Check your connection / VPN.".into(),
+            Self::Unreachable(UnreachableReason::OrgUnavailable) => format!(
+                "The org looks deleted, expired or moved. If it still exists: sf org login web --alias {org} \
+                 — otherwise remove it from sf: sf org logout --target-org {org}"
+            ),
             Self::Unknown(UnknownReason::Timeout) => "Retry; increase the timeout.".into(),
             _ => return None,
         })
@@ -88,6 +96,12 @@ pub fn classify_error(e: &SfError) -> (CapState, &'static str) {
         return (
             CapState::Unreachable(UnreachableReason::NotAuthenticated),
             "NamedOrgNotFoundError (F7)",
+        );
+    }
+    if e.name == "ERROR_HTTP_420" {
+        return (
+            CapState::Unreachable(UnreachableReason::OrgUnavailable),
+            "ERROR_HTTP_420 (F38, observed)",
         );
     }
     if (text.contains("INVALID_TYPE") && text.contains("sObject type") && text.contains("Package"))
@@ -245,6 +259,36 @@ mod tests {
         for (e, want) in cases {
             assert_eq!(classify_error(&e).0, want, "{e:?}");
         }
+    }
+
+    #[test]
+    fn real_http_420_fixture() {
+        let stdout = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../fixtures/sf-2.150.6/package-installed-list.http-420.json"),
+        )
+        .unwrap();
+        let out = RunOutput {
+            argv: vec![],
+            exit_code: Some(1),
+            stdout,
+            stderr: vec![],
+            duration: Default::default(),
+            timed_out: false,
+            cancelled: false,
+            truncated: false,
+        };
+        let c = classify(&out);
+        assert_eq!(
+            c.state,
+            CapState::Unreachable(UnreachableReason::OrgUnavailable)
+        );
+        assert!(
+            c.state
+                .hint("my-org")
+                .unwrap()
+                .contains("sf org logout --target-org my-org")
+        );
     }
 
     #[test]

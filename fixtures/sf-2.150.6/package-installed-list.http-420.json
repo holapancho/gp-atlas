@@ -1,0 +1,13 @@
+{
+  "name": "ERROR_HTTP_420",
+  "message": "HTTP response contains html content.\nCheck that the org exists and can be reached.\n\nHTTP status code: 420.\nREST API Status Codes and Error Responses:\nhttps://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/errorcodes.htm\n\nSee `error.data` for the full html response.",
+  "exitCode": 1,
+  "context": "PackageInstalledListCommand",
+  "data": "hidden",
+  "stack": "hidden",
+  "cause": "hidden",
+  "warnings": [],
+  "code": "1",
+  "status": 1,
+  "commandName": "PackageInstalledListCommand"
+}

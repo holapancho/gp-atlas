@@ -12,6 +12,7 @@ fixture files for `tests/fake-sf`.
 | `alias-list.empty.json` | `sf alias list --json` (no aliases) | 0 |
 | `org-list-skip.derived.json` | **Derived**, not captured: `org-list.real.json` with every `connectedStatus` removed, which is what `--skip-connection-status` omits (F26). Served for `org list --skip-connection-status --json`. Replace with a real capture when available. | 0 |
 | `package-list.real.json` | `sf package list --target-dev-hub <hub> --json` against the owner's default Dev Hub (11 packages: 10 managed, 1 unlocked). The `--verbose` capture was byte-identical, so `index.json` serves this file for both. Owner-sanitized; the hub is served under its sanitized alias `fake0009` from `org-list.real.json`. | 0 |
+| `package-installed-list.http-420.json` | `sf package installed list --target-org <org> --json` against an org that no longer resolves; captured by the project owner (org name removed; the CLI itself printed `data`/`stack`/`cause` as `"hidden"`) | 1 |
 | `package-list.named-org-not-found.json` | `sf package list -v nobody@example.com --json` | 2 |
 | `package1-version-list.named-org-not-found.json` | `sf package1 version list -o nobody@example.com --json` | 2 |
 
