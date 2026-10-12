@@ -2,7 +2,8 @@
 
 *Browse 1GP and 2GP package versions and build `sf` commands.*
 
-GP Atlas is a small, cross-platform desktop companion to the Salesforce CLI.
+GP Atlas is a small, cross-platform **clickable terminal app** that works
+alongside the Salesforce CLI.
 It lets a Salesforce developer browse second-generation (2GP) and
 first-generation (1GP) package versions, see what each org lets them read, and
 build exact, correctly quoted `sf` commands to copy and run themselves.
@@ -11,9 +12,9 @@ build exact, correctly quoted `sf` commands to copy and run themselves.
 > marks are trademarks of Salesforce, Inc. GP Atlas is an independent tool that
 > uses your locally installed Salesforce CLI as its only data source.
 
-**Status:** beta. The desktop UI is not implemented yet. A clickable
-**terminal UI** (`gp-atlas-tui`) and a command-line debug tool
-(`gp-atlas-beta`) run on the same core. See [`docs/BETA.md`](docs/BETA.md) to
+**Status:** beta. The app is the clickable **terminal UI** (`gp-atlas-tui`:
+mouse and keyboard). A command-line debug tool (`gp-atlas-beta`) runs on the
+same core. See [`docs/BETA.md`](docs/BETA.md) to
 download or build and try it, and [`SPEC.md`](SPEC.md) for the full
 specification and milestone plan.
 
@@ -29,7 +30,6 @@ specification and milestone plan.
 | Copy IDs: `c` or right-click a row (OS clipboard, or the terminal's over SSH) | ✅ |
 | Command Builder (forms from the manifest, quoting per shell) | ⏳ not started |
 | Installation-key prompt for key-protected versions | ⏳ not started |
-| Desktop app (egui) | ⏳ not started |
 | Signed release builds | ⏳ not started; unsigned beta binaries come from CI |
 
 ## Read-only guarantee
@@ -77,7 +77,6 @@ cargo test
 | `crates/gp-atlas-core` | UI-free core: CLI contract, manifest, blocklist, validated inputs, `ReadOnlyCommand`, runner, JSON parsing and secret scrubbing, error classification, Doctor, orgs, probes. |
 | `crates/gp-atlas-tui` | `gp-atlas-tui`: clickable terminal UI (ratatui). |
 | `crates/gp-atlas-cli` | `gp-atlas-beta`: command-line debug frontend and sanitized fixture capture ([docs/BETA.md](docs/BETA.md)). |
-| `crates/gp-atlas-egui` | The `gp-atlas` desktop binary (egui UI, not started yet). |
 | `manifest/sf-2.150.6.json` | **Generated** from `sf commands --json`. Never edit it by hand. |
 | `tools/extract-manifest` | Regenerates the baseline manifest from an installed `sf` 2.150.6. |
 | `fixtures/sf-2.150.6/` | Sanitized real `sf` outputs used by tests. |

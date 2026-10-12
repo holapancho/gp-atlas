@@ -9,7 +9,7 @@ version = 2
 [licenses]
 version = 2
 confidence-threshold = 0.9
-# Pre-approved for upcoming UI dependencies (egui stack); not all are used yet.
+# Pre-approved for possible future dependencies; not all are used yet.
 unused-allowed-license = "allow"
 allow = [
     "MIT",

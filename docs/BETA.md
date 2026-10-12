@@ -55,8 +55,8 @@ text with the mouse, hold Shift (Option on macOS) or start with `--no-mouse`.
 
 ## Command-line debug tool (`gp-atlas-beta`)
 
-A command-line **debug build** of GP Atlas. It runs on the same core the desktop
-app will use: the version gate, the read-only command set, the runner,
+A command-line **debug build** of GP Atlas. It runs on the same core as the
+terminal UI: the version gate, the read-only command set, the runner,
 error classification and the Access Matrix. Its two jobs:
 
 1. Let you try GP Atlas against your real orgs today.

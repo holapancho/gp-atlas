@@ -14,7 +14,7 @@ This file is both the **prompt** and the **spec**. Put it in the repo root as `S
 
 ## 1. Agent prompt (role, rules, working agreement)
 
-You are a senior Rust engineer building **GP Atlas**: a small, cross-platform desktop app that lets a Salesforce developer **browse 2GP and 1GP package versions** and **build `sf` commands to run manually**, using the installed Salesforce CLI as its only data source.
+You are a senior Rust engineer building **GP Atlas**: a small, cross-platform **clickable terminal app** (TUI) that lets a Salesforce developer **browse 2GP and 1GP package versions** and **build `sf` commands to run manually**, using the installed Salesforce CLI as its only data source.
 
 **Hard rules — never violate these:**
 
@@ -29,8 +29,8 @@ You are a senior Rust engineer building **GP Atlas**: a small, cross-platform de
 
 **Interpretation notes (decisions already made — don't re-litigate):**
 
-- UI toolkit: **egui/eframe** (native window, virtualized tables via `egui_extras`). All logic lives in a UI-free crate so a TUI frontend can be added later.
-- Binary name: `gp-atlas`. Crate names: `gp-atlas-core`, `gp-atlas-egui`.
+- UI: a **clickable terminal UI** (ratatui + crossterm: mouse and keyboard, virtualized tables). **Decision 2026-10-12 (owner): no desktop/egui app.** Where this spec mentions windows, buttons, dropdowns or tooltips, the TUI equivalent applies (tabs, keys, popups, status line). All logic lives in the UI-free core crate.
+- Binaries: `gp-atlas-tui` (the product) and `gp-atlas-beta` (command-line debug tool). Crate names: `gp-atlas-core`, `gp-atlas-tui`, `gp-atlas-cli`.
 - License: `MIT`. README must say "Not affiliated with or endorsed by Salesforce." Do not use "Salesforce" or "sf" as part of the product name.
 
 ---
@@ -338,7 +338,8 @@ gp-atlas/
 └─ crates/
    ├─ gp-atlas-core/             # NO UI dependencies
    │  └─ src/{runner,manifest,envelope,doctor,orgs,probes,classify,project,aliases,builder,quote,cache,models/}.rs
-   └─ gp-atlas-egui/             # binary `gp-atlas`
+   ├─ gp-atlas-tui/              # binary `gp-atlas-tui` (clickable terminal UI, the product)
+   └─ gp-atlas-cli/              # binary `gp-atlas-beta` (debug tool, fixture capture)
 ```
 
 ### 7.2 Core API sketch
@@ -371,7 +372,7 @@ impl SfRunner {
 
 ### 7.4 UI ↔ core
 
-A background tokio runtime in its own thread. The UI sends `Request`s over a channel and receives `Event`s; each event calls `ctx.request_repaint()`. No `await` on the UI thread. State lives in one `AppState`; screens are pure functions of state.
+A pool of worker threads (high/low priority queues, at most 3 concurrent `sf` processes) runs the blocking runner. The UI submits jobs and drains a result channel every frame (~120 ms poll), so it never waits on `sf`. State lives in one `App`; screens are drawn from state.
 
 ### 7.5 Cache & settings
 
@@ -531,7 +532,7 @@ Each milestone ends with a PR; list the ACs met in the PR description.
 
 ## 14. Dependencies (suggested, not mandatory)
 
-`eframe`/`egui` + `egui_extras` (virtualized tables) · `tokio` (process, time, sync) · `serde`/`serde_json` · `thiserror` · `anyhow` (binary only) · `tracing` + `tracing-subscriber` · `which` · `directories` · `shlex` · `semver` · `regex` (or hand-rolled validators) · `proptest` (argv property tests) · `insta` (snapshot tests) · `cargo-deny`, `cargo-audit` (CI). Pin the Rust toolchain via `rust-toolchain.toml` and set `rust-version` in `Cargo.toml` to what CI uses.
+`ratatui` + `crossterm` (terminal UI, mouse) · `arboard` (clipboard) · std threads + channels · `serde`/`serde_json` · `thiserror` · `anyhow` (binary only) · `tracing` + `tracing-subscriber` · `which` · `directories` · `shlex` · `semver` · `regex` (or hand-rolled validators) · `proptest` (argv property tests) · `insta` (snapshot tests) · `cargo-deny`, `cargo-audit` (CI). Pin the Rust toolchain via `rust-toolchain.toml` and set `rust-version` in `Cargo.toml` to what CI uses.
 
 ---
 

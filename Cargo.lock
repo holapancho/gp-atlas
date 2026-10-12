@@ -629,13 +629,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gp-atlas-egui"
-version = "0.0.1"
-dependencies = [
- "gp-atlas-core",
-]
-
-[[package]]
 name = "gp-atlas-tui"
 version = "0.0.1"
 dependencies = [

@@ -1,7 +1,7 @@
 //! `gp-atlas-beta`: command-line debug frontend for GP Atlas.
 //!
 //! Runs only the read-only commands of `gp_atlas_core::command::ReadOnlyCommand`
-//! through the same core the desktop app will use, and can capture sanitized
+//! through the same core as the terminal UI, and can capture sanitized
 //! fixtures from real orgs (`capture`).
 
 /// `println!` that exits quietly when stdout is closed (e.g. piped to `head`).

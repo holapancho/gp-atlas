@@ -1,7 +1,7 @@
 //! Spawns `sf` for a [`ReadOnlyCommand`] (SPEC §7.3).
 //!
-//! Blocking API: frontends call it from worker threads (the egui app will wrap
-//! it in its background runtime). No shell is ever involved.
+//! Blocking API: frontends call it from worker threads (the TUI's job pool).
+//! No shell is ever involved.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};

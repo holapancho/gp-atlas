@@ -1,7 +1,7 @@
 # Idea: Ancestry & Dependencies views
 
 Status: **built in `gp-atlas-tui`** (2026-10-05), except the installation-key
-prompt (§3, "Key-protected versions") and the desktop app. See "Implementation
+prompt (§3, "Key-protected versions"). See "Implementation
 notes" at the end for what differs from this draft.
 
 Show, for any 2GP package version, **where it comes from** (ancestry) and
@@ -74,7 +74,7 @@ library code (`@salesforce/packaging` 5.0.7), and the plugin's real-org tests.
 - `--verbose`: label shows 04t and version number.
 - `--installation-key` for key-protected versions. **This is a secret** (SPEC §10).
 
-## 3. Proposed UX (TUI first, same design for the desktop app)
+## 3. Proposed UX (terminal UI)
 
 In **2GP Packages & Versions**, on a selected version:
 
@@ -150,7 +150,6 @@ Two views of the same graph, toggled with `t`:
 - `gp-atlas-tui`: two panels in the 2GP tab (or a popup), jobs on the pool
   like other commands, caching per 04t (released versions never change, so a
   long TTL is safe).
-- Desktop app (M4): same model, rendered as tree/list widgets.
 
 ## 5. Unknowns to capture before building (add to SPEC §4.7)
 
