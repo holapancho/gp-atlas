@@ -25,7 +25,8 @@ specification and milestone plan.
 | 2GP packages & versions: split view, filters, latest released, details, copy 04t / install link | ✅ |
 | 2GP ancestry tree and dependency install order (`a` / `A` / `d`) | ✅ (tested on synthetic output; real captures wanted) |
 | Installed packages, 1GP versions, History of every `sf` call | ✅ |
-| Project aliases from `sfdx-project.json` (alias chips, warnings) | ⏳ not started |
+| Project aliases from `sfdx-project.json`: Alias column, orphan / duplicate / unaliased warnings, copyable `packageAliases` snippets | ✅ |
+| Copy IDs: `c` or right-click a row (OS clipboard, or the terminal's over SSH) | ✅ |
 | Command Builder (forms from the manifest, quoting per shell) | ⏳ not started |
 | Installation-key prompt for key-protected versions | ⏳ not started |
 | Desktop app (egui) | ⏳ not started |

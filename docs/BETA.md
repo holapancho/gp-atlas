@@ -18,6 +18,13 @@ It opens full-screen in your terminal. Click a tab or a row (click the selected
 row again to open it), scroll with the wheel, or use the keyboard; `?` shows
 all keys, `q` quits.
 
+**Copying IDs:** `c` or a **right-click** on a row copies its ID (0Ho, 04t; the
+username on Orgs/Access; the command in History). Over SSH, where there is no
+OS clipboard, GP Atlas asks the terminal to copy instead (OSC 52: iTerm2,
+kitty, WezTerm, Windows Terminal, tmux with `set-clipboard on`; not macOS
+Terminal.app). The copied text is also shown in the status line. To select
+text with the mouse, hold Shift (Option on macOS) or start with `--no-mouse`.
+
 1. **Doctor** checks `sf` (≥ 2.150.6), then the app jumps to **Orgs**.
 2. **Orgs**: your default Dev Hub and org are preselected. Select a row and
    press `h` (use as Dev Hub) or `o` (use as target org).
@@ -32,6 +39,15 @@ all keys, `q` quits.
      selected version and its path to the root highlighted. `A` = whole tree.
    - `d` **dependencies**: what to install first, in install order (`t` for a
      tree), and whether each one is already in the selected org.
+   - **Project aliases:** start `gp-atlas-tui` inside an SFDX project (or pass
+     `--project <folder>`; `--no-project` to skip). An **Alias** column then
+     shows each package's and version's alias from `sfdx-project.json`
+     (yellow: several aliases, or the CLI disagrees). The header shows
+     `Project: <folder> · N aliases ⚠ W`; `P` lists the warnings: orphan aliases
+     (ID not in this Dev Hub), packages/versions without an alias, duplicates,
+     ignored entries. `s` copies a `packageAliases` entry for the selected row,
+     `S` entries for every row without an alias, named like the CLI does
+     (`MyApp@1.2.0-3`). GP Atlas never edits `sfdx-project.json`.
 5. **Installed** and **1GP Versions** use the selected org.
 6. **History** lists every `sf` call with exit code, time and stderr.
 
@@ -156,6 +172,7 @@ A release (optimized) build is `cargo build --release -p gp-atlas-tui -p gp-atla
 | `gp-atlas-beta builds --hub X` | Version-create requests (`--status`, `--created-last-days`) |
 | `gp-atlas-beta installed --org X` | Installed packages |
 | `gp-atlas-beta pkg1 --org X` | 1GP versions (`--package-id 033…`, 18 chars) |
+| `gp-atlas-beta project [--dir D] [--hub X]` | Package aliases in `sfdx-project.json`; with `--hub`, orphan aliases and how many packages/versions have none |
 | `gp-atlas-beta show probes --org X` | Print the probe commands without running them |
 | `gp-atlas-beta capture --out DIR` | Run everything and save **sanitized** output for the fixtures |
 

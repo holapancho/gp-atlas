@@ -20,6 +20,7 @@ use ratatui::crossterm::event::{
 use ratatui::layout::{Position, Rect};
 use serde_json::Value;
 
+use crate::aliases::{self, ProjectSource, ProjectState, VersionScope};
 use crate::clip;
 use crate::worker::{Done, Failure, Job, LogEntry, Outcome, Pool, Request};
 
@@ -315,6 +316,9 @@ pub struct App {
     pub status: String,
     pub hits: Hits,
     pub allow_cli_version: Option<String>,
+    /// `sfdx-project.json` package aliases (SPEC §6).
+    pub project: ProjectState,
+    project_source: ProjectSource,
 }
 
 fn new_cancel() -> Arc<AtomicBool> {
@@ -357,7 +361,15 @@ impl App {
             status: "Checking the Salesforce CLI…".into(),
             hits: Hits::default(),
             allow_cli_version,
+            project: ProjectState::Off,
+            project_source: ProjectSource::Off,
         }
+    }
+
+    /// Reads the project's `packageAliases` (read-only).
+    pub fn set_project(&mut self, src: ProjectSource) {
+        self.project_source = src;
+        self.project = ProjectState::load(&self.project_source);
     }
 
     pub fn start(&mut self) {
@@ -973,6 +985,10 @@ impl App {
             self.pane()
         };
         match (pane, c) {
+            (_, 'P') => self.show_project(),
+            (Tab::Packages | Tab::Versions, 's') => self.copy_alias_snippet(false),
+            (Tab::Packages | Tab::Versions, 'S') => self.copy_alias_snippet(true),
+            (_, 'c') => self.copy_id(),
             (Tab::Orgs, 'h') => self.pick_org(true),
             (Tab::Orgs, 'o') => self.pick_org(false),
             (Tab::Access, 'p') => {
@@ -1009,17 +1025,6 @@ impl App {
                 }
             }
             (Tab::Versions, 'y') => self.copy_report_command(),
-            (Tab::Packages, 'c') => self.copy_field("Id", "0Ho id"),
-            (Tab::Versions, 'c') | (Tab::Installed, 'c') => {
-                self.copy_field("SubscriberPackageVersionId", "04t id")
-            }
-            (Tab::Pkg1, 'c') => self.copy_field("MetadataPackageVersionId", "04t id"),
-            (Tab::Log, 'c') => {
-                if let Some(e) = self.log.iter().rev().nth(self.log_scroll.selected) {
-                    let cmd = e.command.clone();
-                    self.copy(&cmd, "command");
-                }
-            }
             _ => {}
         }
     }
@@ -1501,6 +1506,120 @@ impl App {
         }
     }
 
+    /// `c` / right-click: copies the selected row's main identifier.
+    fn copy_id(&mut self) {
+        match self.pane() {
+            Tab::Packages => self.copy_field("Id", "0Ho id"),
+            Tab::Versions | Tab::Installed => {
+                self.copy_field("SubscriberPackageVersionId", "04t id")
+            }
+            Tab::Pkg1 => self.copy_field("MetadataPackageVersionId", "04t id"),
+            Tab::Orgs | Tab::Access => {
+                let scroll = if self.pane() == Tab::Orgs {
+                    self.orgs_scroll
+                } else {
+                    self.access_scroll
+                };
+                if let Some(o) = self.selected_org(scroll) {
+                    self.copy(&o.username, "username");
+                }
+            }
+            Tab::Log => {
+                if let Some(e) = self.log.iter().rev().nth(self.log_scroll.selected) {
+                    let cmd = e.command.clone();
+                    self.copy(&cmd, "command");
+                }
+            }
+            Tab::Doctor => {}
+        }
+    }
+
+    // ----- Project package aliases (SPEC §6) --------------------------------
+
+    pub fn package_rows(&self) -> Option<&[Value]> {
+        match self.packages.load() {
+            Load::Ready(d) => Some(&d.rows),
+            _ => None,
+        }
+    }
+
+    /// Whether the loaded versions cover the whole Dev Hub (04t orphan check).
+    pub fn version_scope(&self) -> VersionScope<'_> {
+        match self.versions.load() {
+            Load::Ready(d) if self.vfilter.package.is_none() && !self.vfilter.released => {
+                VersionScope::All(&d.rows)
+            }
+            Load::Ready(_) => VersionScope::Partial,
+            _ => VersionScope::NotLoaded,
+        }
+    }
+
+    /// Warnings shown on the header chip.
+    pub fn project_warnings(&self) -> usize {
+        self.project.project().map_or(0, |p| {
+            aliases::warning_count(p, self.package_rows(), &self.version_scope())
+        })
+    }
+
+    /// `P`: reloads `sfdx-project.json` and shows aliases and warnings.
+    fn show_project(&mut self) {
+        self.project = ProjectState::load(&self.project_source);
+        let hub = self.hub.as_ref().map(|h| h.target().to_owned());
+        let lines = aliases::report_lines(
+            &self.project,
+            hub.as_deref(),
+            self.package_rows(),
+            &self.version_scope(),
+        );
+        self.popup = Some(Popup {
+            title: "Project package aliases".into(),
+            lines,
+            scroll: 0,
+            loading_id: None,
+        });
+    }
+
+    /// `s`: `packageAliases` line for the selected row. `S`: lines for every
+    /// row of the pane without an alias. Copy only; the file is never edited.
+    fn copy_alias_snippet(&mut self, all: bool) {
+        let project = self.project.project();
+        let versions = self.pane() == Tab::Versions;
+        let (key, entry): (&str, aliases::EntryFn) = if versions {
+            ("SubscriberPackageVersionId", aliases::version_entry)
+        } else {
+            ("Id", aliases::package_entry)
+        };
+        let (text, n) = if all {
+            let rows: Vec<&Value> = if versions {
+                self.version_rows()
+            } else {
+                self.package_rows()
+                    .map(|r| r.iter().collect())
+                    .unwrap_or_default()
+            };
+            aliases::unaliased_snippet(project, &rows, key, entry)
+        } else {
+            match self.selected_row().and_then(|r| entry(project, &r)) {
+                Some(e) => (gp_atlas_core::project::snippet(&[e]), 1),
+                None => (String::new(), 0),
+            }
+        };
+        if n == 0 {
+            self.status = if all {
+                "Every row already has an alias.".into()
+            } else {
+                "Select a package or version first.".into()
+            };
+            return;
+        }
+        let what = if n == 1 {
+            "packageAliases entry".to_owned()
+        } else {
+            format!("{n} packageAliases entries")
+        };
+        self.copy(&text, &what);
+    }
+
     fn copy_field(&mut self, key: &str, what: &str) {
         if let Some(v) = self.selected_row().and_then(|r| str_of(&r, key)) {
             self.copy(&v, what);
@@ -1529,9 +1648,17 @@ impl App {
     }
 
     fn copy(&mut self, text: &str, what: &str) {
+        // The status line is one line: show the first line of longer text.
+        let shown = match text.split_once('\n') {
+            Some((first, _)) => format!("{first} … ({} lines)", text.lines().count()),
+            None => text.to_owned(),
+        };
         self.status = match clip::copy(text) {
-            Ok(()) => format!("Copied {what}: {text}"),
-            Err(e) => format!("Clipboard unavailable ({e}). {what}: {text}"),
+            Ok(clip::Via::Os) => format!("Copied {what}: {shown}"),
+            Ok(clip::Via::Terminal) => {
+                format!("Copied {what} via the terminal (OSC 52): {shown}")
+            }
+            Err(e) => format!("Clipboard unavailable ({e}). {what}: {shown}"),
         };
     }
 
@@ -1555,12 +1682,15 @@ impl App {
     fn show_help(&mut self) {
         let lines = [
             "Mouse: click a tab or a row; click the selected row again to open it;",
-            "       wheel scrolls. (Hold Shift/Option to select text in the terminal.)",
+            "       right-click a row to copy its id; wheel scrolls.",
+            "       (Hold Shift/Option to select text in the terminal, or start with --no-mouse.)",
             "",
             "Keys (all tabs)",
             "  1-7 / Tab / Shift-Tab   switch tab        ↑↓ j k PgUp PgDn g G   move",
             "  Enter                   open / select     r   refresh this tab",
             "  Esc                     cancel / close    ?   help      q  quit",
+            "  c                       copy the selected row's id (username, command)",
+            "  P                       project aliases (sfdx-project.json) and warnings",
             "",
             "Orgs           h  use as Dev Hub      o  use as target org   Enter  either",
             "Access         p  probe this org      a  probe all orgs      t  try 2GP on non-hubs",
@@ -1570,6 +1700,7 @@ impl App {
             "               R released  L latest per package  V verbose  x  all packages",
             "               c copy 0Ho (left) / 04t (right)  i copy install link  y copy report cmd",
             "               Enter on a version: details (package version report)",
+            "               s  copy a packageAliases entry   S  entries for every row without alias",
             "               a  ancestry (version: highlighted path; package: whole tree)",
             "               A  whole package ancestry    d  dependencies (install order)",
             "Graph view     c copy 04t  i install link  t order/tree (deps)  y copy command",
@@ -1664,6 +1795,47 @@ impl App {
                 } else if again {
                     self.activate();
                 }
+            }
+            // Right-click: select the row and copy its id (username on Orgs/Access).
+            MouseEventKind::Down(MouseButton::Right) => {
+                if self.popup.is_some() {
+                    return;
+                }
+                if let Some(gv) = &mut self.graph {
+                    if let Some(rows) = self.hits.graph_rows
+                        && rows.contains(pos)
+                    {
+                        let idx = gv.scroll.offset + (m.row - rows.y) as usize;
+                        if idx < gv.rows().len() {
+                            gv.scroll.selected = idx;
+                            self.graph_key(KeyCode::Char('c'));
+                        }
+                    }
+                    return;
+                }
+                let Some((rows, pane)) = self
+                    .hits
+                    .rows
+                    .iter()
+                    .copied()
+                    .find(|(r, _)| r.contains(pos))
+                else {
+                    return;
+                };
+                if self.tab == Tab::Packages {
+                    self.pkg_focus = pane == Tab::Packages;
+                }
+                let len = self.table_len();
+                let Some(s) = self.scroll_mut() else { return };
+                let idx = s.offset + (m.row - rows.y) as usize;
+                if idx >= len {
+                    return;
+                }
+                s.selected = idx;
+                if pane == Tab::Packages {
+                    self.apply_package_selection();
+                }
+                self.copy_id();
             }
             MouseEventKind::ScrollDown if self.popup.is_none() && self.graph.is_some() => {
                 self.graph_key(KeyCode::PageDown);

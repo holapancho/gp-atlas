@@ -163,6 +163,18 @@ enum Cmd {
         #[arg(long, short = 'i')]
         package_id: Option<String>,
     },
+    /// Package aliases from sfdx-project.json (read-only) and, with --hub,
+    /// orphan aliases (IDs not in that Dev Hub).
+    Project {
+        /// Project folder or sfdx-project.json (default: current folder or its
+        /// closest parent with sfdx-project.json).
+        #[arg(long)]
+        dir: Option<PathBuf>,
+        /// Dev Hub to check the aliases against (runs package list and
+        /// package version list).
+        #[arg(long, short = 'v')]
+        hub: Option<String>,
+    },
     /// Print the exact sf command for a probe/browse action without running it.
     Show {
         #[command(subcommand)]
@@ -377,6 +389,7 @@ fn main() -> ExitCode {
     let r = match cli.cmd {
         Cmd::Doctor => cmd_doctor(&ctx),
         Cmd::Show { what } => cmd_show(&ctx, what),
+        Cmd::Project { dir, hub: None } => cmd_project(&ctx, dir, None),
         other => gate(&ctx).and_then(|()| dispatch(&ctx, other)),
     };
     r.err().unwrap_or(ExitCode::SUCCESS)
@@ -531,6 +544,7 @@ fn dispatch(ctx: &Ctx, cmd: Cmd) -> Result<(), ExitCode> {
             no_probes,
             max_orgs,
         } => capture::run(ctx, &out, !no_probes, max_orgs),
+        Cmd::Project { dir, hub } => cmd_project(ctx, dir, hub.as_deref()),
         Cmd::Doctor | Cmd::Show { .. } => unreachable!(),
     }
 }
@@ -816,6 +830,102 @@ fn cmd_probe(ctx: &Ctx, only: &[String], try_anyway: bool, details: bool) -> Res
                 out!("  fix (copy only): {h}");
             }
         }
+    }
+    Ok(())
+}
+
+fn cmd_project(ctx: &Ctx, dir: Option<PathBuf>, hub: Option<&str>) -> Result<(), ExitCode> {
+    use gp_atlas_core::project::{AliasKind, Project, printable};
+    let start = match dir {
+        Some(d) => d,
+        None => std::env::current_dir().map_err(bad)?,
+    };
+    let p = Project::discover(&start).map_err(bad)?;
+    out!("File: {}", printable(&p.file.display().to_string()));
+    out!(
+        "{} package aliases (0Ho), {} version aliases (04t). GP Atlas never edits this file.",
+        p.count(AliasKind::Package),
+        p.count(AliasKind::Version)
+    );
+    let rows: Vec<Value> = p
+        .entries
+        .iter()
+        .map(|e| {
+            serde_json::json!({
+                "Alias": e.alias,
+                "Kind": match e.kind { AliasKind::Package => "package", AliasKind::Version => "version" },
+                "Id": e.id,
+            })
+        })
+        .collect();
+    print_rows(
+        ctx,
+        &Value::Array(rows),
+        &[],
+        &[("Alias", "Alias"), ("Kind", "Kind"), ("Id", "Id")],
+    );
+    let mut warnings = 0;
+    for (id, aliases) in p.duplicates() {
+        warnings += 1;
+        out!("⚠ several aliases for {id}: {}", aliases.join(", "));
+    }
+    for sk in &p.skipped {
+        warnings += 1;
+        out!("⚠ ignored {:?}: {}", sk.alias, sk.reason);
+    }
+    if let Some(hub) = hub {
+        let hub_ref = org(hub)?;
+        let (pk, _) = ctx.result(
+            &ReadOnlyCommand::PkgList {
+                hub: hub_ref.clone(),
+                verbose: false,
+                api_version: None,
+            },
+            None,
+        )?;
+        let (vs, _) = ctx.result(
+            &ReadOnlyCommand::PkgVersionList(PkgVersionListArgs::new(hub_ref)),
+            None,
+        )?;
+        let ids = |v: &Value, key: &str| -> Vec<String> {
+            v.as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|r| r.get(key)?.as_str().map(str::to_owned))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let pk_ids = ids(&pk, "Id");
+        let v_ids = ids(&vs, "SubscriberPackageVersionId");
+        for (kind, known) in [(AliasKind::Package, &pk_ids), (AliasKind::Version, &v_ids)] {
+            for e in p.orphans(kind, known.iter().map(String::as_str)) {
+                warnings += 1;
+                out!(
+                    "⚠ orphan alias {} → {}: not in {hub} (another Dev Hub, or deleted)",
+                    e.alias,
+                    e.id
+                );
+            }
+        }
+        let unaliased = pk_ids
+            .iter()
+            .filter(|id| p.aliases_for(id).is_empty())
+            .count();
+        out!(
+            "{unaliased} of {} packages and {} of {} versions in {hub} have no alias.",
+            pk_ids.len(),
+            v_ids
+                .iter()
+                .filter(|id| p.aliases_for(id).is_empty())
+                .count(),
+            v_ids.len()
+        );
+    } else {
+        out!("(add --hub <dev hub> to check for orphan aliases)");
+    }
+    if warnings == 0 {
+        out!("✓ no alias warnings");
     }
     Ok(())
 }

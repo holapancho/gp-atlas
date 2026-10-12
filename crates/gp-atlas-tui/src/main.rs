@@ -1,5 +1,6 @@
 //! `gp-atlas-tui`: clickable terminal UI for GP Atlas (read-only).
 
+mod aliases;
 mod app;
 mod clip;
 mod ui;
@@ -17,6 +18,7 @@ use gp_atlas_core::runner::{RunnerConfig, SfRunner, resolve_sf_bin};
 use ratatui::crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event};
 use ratatui::crossterm::execute;
 
+use crate::aliases::ProjectSource;
 use crate::app::App;
 use crate::worker::Pool;
 
@@ -42,6 +44,13 @@ struct Cli {
     /// Disable mouse capture (lets the terminal select text normally).
     #[arg(long)]
     no_mouse: bool,
+    /// SFDX project (folder or sfdx-project.json) whose packageAliases to show.
+    /// Default: the current folder or its closest parent with sfdx-project.json.
+    #[arg(long, value_name = "PATH", conflicts_with = "no_project")]
+    project: Option<PathBuf>,
+    /// Do not look for sfdx-project.json.
+    #[arg(long)]
+    no_project: bool,
 }
 
 fn main() -> ExitCode {
@@ -66,6 +75,14 @@ fn main() -> ExitCode {
     let (tx, rx) = mpsc::channel();
     let pool = Pool::start(SfRunner::new(cfg), manifest.clone(), tx);
     let mut app = App::new(pool, manifest, cli.allow_cli_version);
+    app.set_project(match (cli.no_project, cli.project) {
+        (true, _) => ProjectSource::Off,
+        (false, Some(p)) => ProjectSource::Path(p),
+        (false, None) => match std::env::current_dir() {
+            Ok(d) => ProjectSource::Auto(d),
+            Err(_) => ProjectSource::Off,
+        },
+    });
     app.start();
 
     // ratatui::init enables raw mode + alternate screen and restores on panic.

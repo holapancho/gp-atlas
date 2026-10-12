@@ -5,6 +5,7 @@ use std::time::Instant;
 use gp_atlas_core::classify::CapState;
 use gp_atlas_core::doctor::Check;
 use gp_atlas_core::probes::Capability;
+use gp_atlas_core::project::Project;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -13,6 +14,7 @@ use ratatui::widgets::{
     Block, Borders, Cell as TCell, Clear, Paragraph, Row, Table, TableState, Wrap,
 };
 
+use crate::aliases::{self, ProjectState};
 use crate::app::{App, Cell, Gate, GraphKind, Load, Scroll, Tab, cell_text, failure_lines};
 
 const SPINNER: [&str; 4] = ["◐", "◓", "◑", "◒"];
@@ -96,6 +98,25 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
         label(&app.org),
         Style::new().fg(Color::Cyan).bold(),
     ));
+    if !matches!(app.project, ProjectState::Off) {
+        spans.push(Span::styled("  │  Project: ", dim()));
+        let failed = matches!(app.project, ProjectState::Failed(_));
+        spans.push(Span::styled(
+            app.project.chip(),
+            if failed {
+                Style::new().fg(Color::Red)
+            } else {
+                Style::new().fg(Color::Cyan)
+            },
+        ));
+        let warnings = app.project_warnings();
+        if warnings > 0 {
+            spans.push(Span::styled(
+                format!(" ⚠ {warnings} (P)"),
+                Style::new().fg(Color::Yellow),
+            ));
+        }
+    }
     if app.any_loading() {
         spans.push(Span::styled(
             format!("  {} working", spinner()),
@@ -144,17 +165,19 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
     } else {
         match app.pane() {
             Tab::Doctor => "r re-run checks",
-            Tab::Orgs => "h use as Dev Hub · o use as org · Enter select · r refresh",
+            Tab::Orgs => {
+                "h use as Dev Hub · o use as org · Enter select · c copy username · r refresh"
+            }
             Tab::Access => {
                 "p probe org · a probe all · t try 2GP on non-hubs · ←→ column · Enter details · Esc cancel"
             }
             Tab::Packages => {
-                "↑↓/click: versions · → or Enter: go to versions · a/A ancestry · c copy 0Ho · r refresh"
+                "↑↓/click: versions · → or Enter: go to versions · a/A ancestry · c copy 0Ho · s/S alias snippet · P project · r refresh"
             }
             Tab::Versions => {
-                "← pkgs · a ancestry · d dependencies · R released · L latest · V verbose · x all · c 04t · i link · Enter details"
+                "← pkgs · a ancestry · d deps · R released · L latest · V verbose · x all · c 04t · i link · s/S alias snippet · P project · Enter details"
             }
-            Tab::Installed | Tab::Pkg1 => "c copy 04t · Enter details · r refresh",
+            Tab::Installed | Tab::Pkg1 => "c / right-click copy 04t · Enter details · r refresh",
             Tab::Log => "Enter details · c copy command",
         }
     };
@@ -589,6 +612,14 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<
                 "AncestorVersion",
                 "CreatedDate",
             ];
+            if app.project.project().is_some() {
+                // Min outranks Length: the fixed columns give way first.
+                h.insert(1, "Alias");
+                w[0] = Constraint::Min(10);
+                w[2] = Constraint::Min(18); // 04t stays whole
+                w.insert(1, Constraint::Min(16));
+                k.insert(1, ALIAS_KEY);
+            }
             if app.vfilter.verbose {
                 h.push("Coverage");
                 w.push(Constraint::Length(9));
@@ -655,6 +686,7 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<
         return message(f, area, title, l);
     }
     title.push_str(&format!("· {} rows ", rows.len()));
+    let project = app.project.project();
     let scroll = match tab {
         Tab::Packages => &mut app.packages.scroll,
         Tab::Versions => &mut app.versions.scroll,
@@ -675,6 +707,9 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<
         |i| {
             keys.iter()
                 .map(|k| {
+                    if *k == ALIAS_KEY {
+                        return alias_tcell(project, &rows[i], "SubscriberPackageVersionId");
+                    }
                     let t = cell_text(&rows[i], k);
                     let style = if *k == "IsReleased" && t == "true" {
                         Style::new().fg(Color::Green)
@@ -686,6 +721,25 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<
                 .collect()
         },
     );
+}
+
+/// Pseudo column key for the project alias column.
+const ALIAS_KEY: &str = "\0alias";
+
+/// Alias column cell: project alias(es); "—" when the row has none;
+/// yellow for several aliases or a disagreement with the CLI's own `Alias`.
+fn alias_tcell(project: Option<&Project>, row: &serde_json::Value, id_key: &str) -> TCell<'static> {
+    let Some(p) = project else {
+        return TCell::from("");
+    };
+    let c = aliases::alias_cell(p, row, id_key);
+    if c.text.is_empty() {
+        TCell::from("—").style(dim())
+    } else if c.warn {
+        TCell::from(c.text).style(Style::new().fg(Color::Yellow))
+    } else {
+        TCell::from(c.text).style(Style::new().fg(Color::Cyan))
+    }
 }
 
 /// 2GP tab: packages (left) and versions of the selected package (right).
@@ -729,6 +783,22 @@ fn draw_2gp(f: &mut Frame, app: &mut App, area: Rect) {
         ),
         Load::Ready(d) => {
             let rows = d.rows.clone();
+            let project = app.project.project();
+            let (header, widths): (&[&str], &[Constraint]) = if project.is_some() {
+                (
+                    &["Package", "Alias", "Type"],
+                    &[
+                        Constraint::Fill(1),
+                        Constraint::Fill(1),
+                        Constraint::Length(8),
+                    ],
+                )
+            } else {
+                (
+                    &["Package", "Type"],
+                    &[Constraint::Fill(1), Constraint::Length(8)],
+                )
+            };
             draw_rows(
                 f,
                 &mut app.hits.rows,
@@ -736,22 +806,24 @@ fn draw_2gp(f: &mut Frame, app: &mut App, area: Rect) {
                 Some(focus_left),
                 left,
                 format!("{title}· {} ", rows.len()),
-                &["Package", "Type"],
-                &[Constraint::Fill(1), Constraint::Length(8)],
+                header,
+                widths,
                 rows.len() + 1,
                 &mut app.packages.scroll,
                 |i| {
+                    let mut cells = Vec::with_capacity(3);
                     if i == 0 {
-                        return vec![
-                            TCell::from("‹ All packages ›").style(Style::new().italic()),
-                            TCell::from(""),
-                        ];
+                        cells.push(TCell::from("‹ All packages ›").style(Style::new().italic()));
+                        cells.resize(header.len(), TCell::from(""));
+                        return cells;
                     }
                     let r = &rows[i - 1];
-                    vec![
-                        TCell::from(cell_text(r, "Name")),
-                        TCell::from(cell_text(r, "ContainerOptions")).style(dim()),
-                    ]
+                    cells.push(TCell::from(cell_text(r, "Name")));
+                    if project.is_some() {
+                        cells.push(alias_tcell(project, r, "Id"));
+                    }
+                    cells.push(TCell::from(cell_text(r, "ContainerOptions")).style(dim()));
+                    cells
                 },
             );
         }
@@ -1099,6 +1171,47 @@ mod tests {
                 "{text}"
             );
             assert!(app.hits.graph_rows.is_some());
+        }
+    }
+
+    #[test]
+    fn project_aliases_render() {
+        use gp_atlas_core::project::Project;
+        let mut app = app();
+        let json = r#"{"packageAliases": {"MyAlias": "0Ho00000000000jCAA",
+            "Ghost": "0Ho000000000099CAA", "MyAlias@1.0.0-1": "04t000000000001AAA"}}"#;
+        app.project = ProjectState::Loaded(
+            Project::parse(
+                std::path::Path::new("/w/demo/sfdx-project.json"),
+                json.as_bytes(),
+            )
+            .unwrap(),
+        );
+        app.versions.load = Some(Load::Ready(ListData {
+            rows: vec![serde_json::json!({
+                "Package2Name": "fake0219", "Package2Id": "0Ho00000000000jCAA",
+                "Version": "1.0.0.1", "SubscriberPackageVersionId": "04t000000000001AAA",
+                "IsReleased": true, "Alias": ""
+            })],
+            warnings: vec![],
+        }));
+        app.tab = Tab::Packages;
+        let mut term = Terminal::new(TestBackend::new(200, 30)).unwrap();
+        term.draw(|f| draw(f, &mut app)).unwrap();
+        let text: String = term
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol())
+            .collect();
+        assert!(text.contains("Project: demo · 3 aliases"), "{text}");
+        // "Ghost" is not in the Dev Hub: one orphan warning.
+        assert!(text.contains("⚠ 1 (P)"), "{text}");
+        assert!(text.contains("MyAlias@1.0.0-1"), "{text}");
+        for (w, h) in [(80, 24), (30, 8), (1, 1)] {
+            let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
+            term.draw(|f| draw(f, &mut app)).unwrap();
         }
     }
 

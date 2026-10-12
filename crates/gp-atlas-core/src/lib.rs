@@ -2,7 +2,8 @@
 //!
 //! Contains the pinned CLI contract (manifest, blocklist), validated inputs,
 //! the closed `ReadOnlyCommand` set, the runner, JSON parsing and scrubbing,
-//! error classification, Doctor checks, org inventory and capability probes.
+//! error classification, Doctor checks, org inventory, capability probes and
+//! project package aliases.
 
 pub mod blocklist;
 pub mod classify;
@@ -14,6 +15,7 @@ pub mod ids;
 pub mod manifest;
 pub mod orgs;
 pub mod probes;
+pub mod project;
 pub mod runner;
 pub mod versions;
 

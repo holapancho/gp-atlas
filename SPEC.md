@@ -137,6 +137,7 @@ Binary resolution order: `GP_ATLAS_SF_BIN` env var → setting in app config →
 | F37 | `@salesforce/cli` **2.152.14** (latest on 2026-10-05) bundles `@salesforce/plugin-packaging` **3.0.7**; all 18 manifest commands match the 2.150.6 baseline (no D4 drift). | Contract tests in compat mode against a clean install. |
 | F38 | An org that no longer resolves (deleted scratch org, expired trial, refreshed sandbox, changed domain) makes data commands fail with `name: "ERROR_HTTP_420"`, `code: "1"`, `exitCode: 1`, message "HTTP response contains html content. Check that the org exists and can be reached. HTTP status code: 420…"; `data`, `stack` and `cause` are printed as `"hidden"`. `org list` shows the same text as `connectedStatus` (F36). Classified `Unreachable(OrgUnavailable)`. | Owner's capture `fixtures/sf-2.150.6/package-installed-list.http-420.json`. |
 | F39 | `displayancestry --json` (no `--dot-code`) returns only `children[0]` of the producer, i.e. **the first root** for a package (`0Ho`) with several roots; for a version (`04t`) it returns that version and its **descendants**, not its ancestors. `--dot-code` lists **all** released versions of all roots with parent→child edges (`node<04t> [label="M.m.p.b"]`, `node<a> -- node<b>`). `displaydependencies` always returns DOT (`node_<04t> [label="Name@M.m.p.b"( color="green")]`, green = selected version and its direct dependencies; root-last edges `node_<a> -> node_<b>` = install a before b). GP Atlas therefore uses `--dot-code` for ancestry and computes the path to the root itself. | Installed `@salesforce/packaging` 5.0.7 `lib/package/packageAncestry.js`, `packageVersionDependency.js`. |
+| F40 | When the CLI writes a version alias (`package version create` / `promote` update `packageAliases`), the key is `<first alias of the 0Ho, else the package Name>@<major>.<minor>.<patch>-<build>[-<branch>]` (build omitted when 0/empty). | `@salesforce/packaging` `src/package/packageVersion.ts` (promote) and `src/utils/packageUtils.ts` `generatePackageAliasEntry`. |
 
 ### 4.4 Command manifest (allow-list)
 
@@ -302,6 +303,12 @@ Each screen requires its capability for the *selected* org. If not `Allowed`: sh
 - Package rows and version rows show **alias chips** (all aliases for that ID; first in file order is "primary"). Tooltip shows the full ID.
 - Warnings (non-blocking): **orphan alias** (alias → ID not present in the current Dev Hub results — possibly another Dev Hub), **unaliased ID** (row has no alias), **duplicate** (several aliases → same ID).
 - If the CLI's own `Alias` column is non-empty, show it too and flag a mismatch with the project-derived value.
+
+**Implemented (TUI, `gp-atlas-beta project`):** the project comes from `--project <folder|file>` or, by default, the
+current folder and its parents (F32); `--no-project` turns it off. Entries whose alias fails the `PackageAlias` rule or whose
+value is not a 0Ho/04t id are listed as ignored. The 04t orphan check runs only when every version of the Dev Hub is loaded
+(all packages, released filter off). Snippets use the CLI's own naming (F40). Code: `gp-atlas-core/src/project.rs`,
+`gp-atlas-tui/src/aliases.rs`.
 
 ### 6.4 Builder rules
 
