@@ -413,6 +413,14 @@ Top bar: **CLI pill** (✅ 2.150.6 / ⛔ mismatch), **Dev Hub selector**, **Pack
 - Buttons: **Copy** and (for runnable commands) **Run in GP Atlas**. v1.1 copy-only templates carry the "⚠ changes state — GP Atlas will not run this" badge.
 - Secrets (`--installation-key`) are masked, never stored, never written to History; the preview shows `<INSTALLATION_KEY>` unless the user explicitly toggles "include in copied command" for that single copy.
 
+**Implemented (2026-10-15), read-only commands only:** `gp-atlas-core/src/builder.rs`
+(forms from the manifest, AC-31; `build()` validates every field and returns a
+`ReadOnlyCommand`; `render()` prints that command's own argv, so the copied
+text equals what GP Atlas runs) and `quote.rs` (§9.3 tables). TUI tab 8.
+Not yet: `--installation-key` (masked input, AC-35) and v1.1 copy-only
+mutating templates (see `docs/ideas/WRITE_ACTIONS_AND_PUSH_UPGRADES.md`); the
+builder lists such flags as "not offered".
+
 ### 9.2 Validation patterns (reject, don't sanitize)
 
 | Value | Rule |

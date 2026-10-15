@@ -6,6 +6,7 @@
 //! project package aliases.
 
 pub mod blocklist;
+pub mod builder;
 pub mod classify;
 pub mod command;
 pub mod doctor;
@@ -17,6 +18,7 @@ pub mod orgs;
 pub mod probe_cache;
 pub mod probes;
 pub mod project;
+pub mod quote;
 pub mod runner;
 pub mod versions;
 

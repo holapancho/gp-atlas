@@ -78,43 +78,15 @@ fn base64(bytes: &[u8]) -> String {
     out
 }
 
-/// POSIX shell quoting (bash/zsh). Values are already validated (§9.2), so this
-/// is defence in depth.
-pub fn quote_posix(arg: &str) -> String {
-    let safe = !arg.is_empty()
-        && arg
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || "._@+-/:=,".contains(c));
-    if safe {
-        arg.to_owned()
-    } else {
-        format!("'{}'", arg.replace('\'', r"'\''"))
-    }
-}
-
-/// The command a human would run: no `--json` (§9.1 default for copy).
+/// The command a human would run: no `--json` (§9.1 default for copy), quoted
+/// for bash/zsh by the same renderer as the Command Builder.
 pub fn command_for_copy(cmd: &ReadOnlyCommand, manifest: &Manifest) -> Option<String> {
-    let argv = cmd.argv(manifest).ok()?;
-    let parts: Vec<String> = argv
-        .iter()
-        .filter(|a| a.as_str() != "--json")
-        .map(|a| quote_posix(a))
-        .collect();
-    Some(format!("sf {}", parts.join(" ")))
+    gp_atlas_core::builder::render(cmd, manifest, &Default::default()).ok()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn quoting() {
-        assert_eq!(quote_posix("my-hub"), "my-hub");
-        assert_eq!(quote_posix("My Pkg"), "'My Pkg'");
-        assert_eq!(quote_posix("it's"), r"'it'\''s'");
-        assert_eq!(quote_posix("$HOME"), "'$HOME'");
-        assert_eq!(quote_posix(""), "''");
-    }
 
     #[test]
     fn osc52_base64() {

@@ -22,6 +22,7 @@ use ratatui::layout::{Position, Rect};
 use serde_json::Value;
 
 use crate::aliases::{self, ProjectSource, ProjectState, VersionScope};
+use crate::build_tab::BuilderState;
 use crate::clip;
 use crate::worker::{Done, Failure, Job, LogEntry, Outcome, Pool, Request};
 
@@ -41,11 +42,12 @@ pub enum Tab {
     Installed,
     Pkg1,
     Log,
+    Builder,
 }
 
 impl Tab {
     /// Visible tabs. `Versions` is not a tab: it is the right pane of `Packages`.
-    pub const ALL: [Tab; 7] = [
+    pub const ALL: [Tab; 8] = [
         Tab::Doctor,
         Tab::Orgs,
         Tab::Access,
@@ -53,6 +55,7 @@ impl Tab {
         Tab::Installed,
         Tab::Pkg1,
         Tab::Log,
+        Tab::Builder,
     ];
 
     pub fn title(self) -> &'static str {
@@ -65,6 +68,7 @@ impl Tab {
             Tab::Installed => "Installed",
             Tab::Pkg1 => "1GP Versions",
             Tab::Log => "History",
+            Tab::Builder => "Command Builder",
         }
     }
 }
@@ -288,6 +292,9 @@ pub struct Hits {
     /// Column x-ranges of the Access matrix capability columns.
     pub access_cols: Vec<(u16, u16)>,
     pub popup: Option<Rect>,
+    /// Command Builder: command list and form rows areas.
+    pub builder_cmds: Option<Rect>,
+    pub builder_fields: Option<Rect>,
     /// Graph overlay and its rows area.
     pub graph: Option<Rect>,
     pub graph_rows: Option<Rect>,
@@ -337,6 +344,7 @@ pub struct App {
     pub allow_cli_version: Option<String>,
     /// `sfdx-project.json` package aliases (SPEC §6).
     pub project: ProjectState,
+    pub builder: BuilderState,
     project_source: ProjectSource,
 }
 
@@ -385,6 +393,7 @@ impl App {
             hits: Hits::default(),
             allow_cli_version,
             project: ProjectState::Off,
+            builder: BuilderState::default(),
             project_source: ProjectSource::Off,
         }
     }
@@ -505,6 +514,7 @@ impl App {
             (Job::Installed { .. }, o) => finish(&mut self.installed, id, o),
             (Job::Pkg1 { .. }, o) => finish(&mut self.pkg1, id, o),
             (Job::Ancestry { .. } | Job::Deps { .. }, o) => self.on_graph(id, o),
+            (Job::Run { .. }, o) => self.on_builder_run(id, o),
             (Job::Report { .. }, o)
                 if self
                     .graph
@@ -709,7 +719,7 @@ impl App {
                 }
                 return;
             }
-            Tab::Log => return,
+            Tab::Log | Tab::Builder => return,
             _ => {}
         }
         self.load_panel(tab, force);
@@ -1013,6 +1023,10 @@ impl App {
                 _ => 0,
             },
             Tab::Log => self.log.len(),
+            Tab::Builder if self.builder.in_form => {
+                self.builder_form().map_or(0, |f| f.fields.len())
+            }
+            Tab::Builder => gp_atlas_core::builder::BUILDER_COMMANDS.len(),
             Tab::Doctor => 0,
         }
     }
@@ -1032,6 +1046,8 @@ impl App {
             Tab::Orgs => &mut self.orgs_scroll,
             Tab::Access => &mut self.access_scroll,
             Tab::Log => &mut self.log_scroll,
+            Tab::Builder if self.builder.in_form => &mut self.builder.field_scroll,
+            Tab::Builder => &mut self.builder.cmd_scroll,
             Tab::Doctor => return None,
             t => &mut self.panel_mut(t)?.scroll,
         })
@@ -1134,6 +1150,9 @@ impl App {
 
     fn switch_tab(&mut self, tab: Tab) {
         self.tab = tab;
+        if tab == Tab::Builder {
+            self.builder_prefill();
+        }
         self.load_tab(false);
     }
 
@@ -1145,6 +1164,12 @@ impl App {
         }
         if self.pane() == Tab::Packages && self.scroll_mut().map(|s| s.selected) != before {
             self.pkg_changed = Some(Instant::now());
+        }
+        if self.tab == Tab::Builder && !self.builder.in_form {
+            let i = self.builder.cmd_scroll.selected;
+            if i != self.builder.cmd {
+                self.builder_select_command(i);
+            }
         }
     }
 
@@ -1176,30 +1201,47 @@ impl App {
             self.graph_key(k.code);
             return;
         }
+        if self.tab == Tab::Builder && self.builder_edit_key(k) {
+            return;
+        }
+        if self.tab == Tab::Builder
+            && self.builder.in_form
+            && matches!(k.code, KeyCode::Backspace | KeyCode::Delete)
+        {
+            self.builder_clear_field();
+            return;
+        }
         match k.code {
             KeyCode::Char('q') => self.quit = true,
             KeyCode::Char('?') => self.show_help(),
             KeyCode::Esc => self.cancel_current(),
             KeyCode::Tab | KeyCode::Right
-                if k.code == KeyCode::Tab || !matches!(self.tab, Tab::Access | Tab::Packages) =>
+                if k.code == KeyCode::Tab
+                    || !matches!(self.tab, Tab::Access | Tab::Packages | Tab::Builder) =>
             {
                 let i = Tab::ALL.iter().position(|t| *t == self.tab).unwrap_or(0);
                 self.switch_tab(Tab::ALL[(i + 1) % Tab::ALL.len()]);
             }
             KeyCode::BackTab | KeyCode::Left
                 if k.code == KeyCode::BackTab
-                    || !matches!(self.tab, Tab::Access | Tab::Packages) =>
+                    || !matches!(self.tab, Tab::Access | Tab::Packages | Tab::Builder) =>
             {
                 let i = Tab::ALL.iter().position(|t| *t == self.tab).unwrap_or(0);
                 self.switch_tab(Tab::ALL[(i + Tab::ALL.len() - 1) % Tab::ALL.len()]);
             }
             KeyCode::Left if self.tab == Tab::Packages => self.pkg_focus = true,
+            KeyCode::Left if self.tab == Tab::Builder => self.builder.in_form = false,
+            KeyCode::Right if self.tab == Tab::Builder => {
+                self.builder.in_form = true;
+                self.builder_prefill();
+            }
+            KeyCode::Char(' ') if self.tab == Tab::Builder => self.builder_activate(),
             KeyCode::Right if self.tab == Tab::Packages => self.pkg_focus = false,
             KeyCode::Left => self.access_col = self.access_col.saturating_sub(1),
             KeyCode::Right => {
                 self.access_col = (self.access_col + 1).min(Capability::ALL.len() - 1)
             }
-            KeyCode::Char(c @ '1'..='7') => {
+            KeyCode::Char(c @ '1'..='8') => {
                 let i = c as usize - '1' as usize;
                 self.switch_tab(Tab::ALL[i]);
             }
@@ -1229,6 +1271,9 @@ impl App {
         } else {
             self.pane()
         };
+        if self.tab == Tab::Builder && self.builder_key(c) {
+            return;
+        }
         match (pane, c) {
             (_, 'P') => self.show_project(),
             (Tab::Pkg1, 'R' | 'L' | 'f' | 'x') => self.pkg1_key(c),
@@ -1304,6 +1349,7 @@ impl App {
 
     fn activate(&mut self) {
         match self.pane() {
+            Tab::Builder => self.builder_activate(),
             Tab::Orgs => {
                 let is_hub = self
                     .selected_org(self.orgs_scroll)
@@ -1904,6 +1950,9 @@ impl App {
                 self.copy_field("SubscriberPackageVersionId", "04t id")
             }
             Tab::Pkg1 => self.copy_field("MetadataPackageVersionId", "04t id"),
+            Tab::Builder => {
+                self.builder_key('c');
+            }
             Tab::Orgs | Tab::Access => {
                 let scroll = if self.pane() == Tab::Orgs {
                     self.orgs_scroll
@@ -2037,6 +2086,15 @@ impl App {
         }
     }
 
+    pub(crate) fn copy_text(&mut self, text: &str, what: &str) {
+        self.copy(text, what);
+    }
+
+    /// Submits a job (gate and contract checks apply); returns its id.
+    pub(crate) fn submit_job(&mut self, job: Job) -> Result<u64, Failure> {
+        self.submit(job, false, new_cancel()).map(|(id, _)| id)
+    }
+
     fn copy(&mut self, text: &str, what: &str) {
         // The status line is one line: show the first line of longer text.
         let shown = match text.split_once('\n') {
@@ -2076,7 +2134,7 @@ impl App {
             "       (Hold Shift/Option to select text in the terminal, or start with --no-mouse.)",
             "",
             "Keys (all tabs)",
-            "  1-7 / Tab / Shift-Tab   switch tab        ↑↓ j k PgUp PgDn g G   move",
+            "  1-8 / Tab / Shift-Tab   switch tab        ↑↓ j k PgUp PgDn g G   move",
             "  Enter                   open / select     r   refresh this tab",
             "  Esc                     cancel / close    ?   help      q  quit",
             "  c                       copy the selected row's id (username, command)",
@@ -2099,6 +2157,10 @@ impl App {
             "Installed/1GP  c  copy 04t            Enter  details",
             "1GP            R released  L latest released per package  f only this package  x clear",
             "History        c  copy command        Enter  details (exit code, stderr)",
+            "Builder        ←/→ commands/form   ↑↓ field   Enter/Space edit, toggle or cycle",
+            "               Del clear field   f fill from selection   x clear form",
+            "               s shell (bash/zsh, PowerShell, cmd)   J --json   F short flags   M multi-line",
+            "               U alias↔username   A package ID↔alias   c copy   R run in GP Atlas (read-only)",
             "",
             "GP Atlas only runs read-only sf commands. Copied commands are never run.",
         ];
@@ -2136,6 +2198,9 @@ impl App {
                         }
                         _ => {}
                     }
+                    return;
+                }
+                if self.tab == Tab::Builder && self.builder_click(pos) {
                     return;
                 }
                 if let Some(tab) = self

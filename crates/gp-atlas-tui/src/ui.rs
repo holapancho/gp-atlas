@@ -52,6 +52,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             draw_panel(f, app, body, tab, None);
         }
         Tab::Log => draw_log(f, app, body),
+        Tab::Builder => draw_builder(f, app, body),
     }
     draw_footer(f, app, footer);
     if app.graph.is_some() {
@@ -182,6 +183,12 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
                 "R released · L latest per package · f only this package · x clear · c copy 04t · Enter details · r refresh"
             }
             Tab::Log => "Enter details · c copy command",
+            Tab::Builder if app.builder.editing.is_some() => {
+                "typing… Enter accept · Esc cancel · Backspace delete · Ctrl-U clear"
+            }
+            Tab::Builder => {
+                "←→ list/form · Enter edit · Del clear · s shell · J json · F short · M lines · U alias/user · A pkg alias · f fill · c copy · R run"
+            }
         }
     };
     let lines = vec![
@@ -851,6 +858,151 @@ fn draw_2gp(f: &mut Frame, app: &mut App, area: Rect) {
     draw_panel(f, app, right, Tab::Versions, Some(!focus_left));
 }
 
+/// Command Builder: commands (left), form (right top), command preview.
+fn draw_builder(f: &mut Frame, app: &mut App, area: Rect) {
+    use gp_atlas_core::builder::{BUILDER_COMMANDS, FieldKind};
+    let [left, right] =
+        Layout::horizontal([Constraint::Length(40), Constraint::Fill(1)]).areas(area);
+    let preview = app.builder_preview();
+    let in_form = app.builder.in_form;
+
+    // Commands
+    let mut scratch = Vec::new();
+    let current = app.builder.cmd;
+    draw_rows(
+        f,
+        &mut scratch,
+        Tab::Builder,
+        Some(!in_form),
+        left,
+        " Read-only commands ".into(),
+        &["sf …"],
+        &[Constraint::Fill(1)],
+        BUILDER_COMMANDS.len(),
+        &mut app.builder.cmd_scroll,
+        |i| {
+            let style = if i == current {
+                Style::new().fg(Color::Cyan)
+            } else {
+                Style::new()
+            };
+            vec![TCell::from(BUILDER_COMMANDS[i].replace(':', " ")).style(style)]
+        },
+    );
+    app.hits.builder_cmds = scratch.first().map(|(r, _)| *r);
+
+    let preview_h = (6 + preview.notes.len() as u16).min(area.height / 2).max(5);
+    let [form_area, prev_area] =
+        Layout::vertical([Constraint::Fill(1), Constraint::Length(preview_h)]).areas(right);
+
+    // Form
+    let id = app.builder_id().replace(':', " ");
+    let values = app
+        .builder
+        .values
+        .get(app.builder_id())
+        .cloned()
+        .unwrap_or_default();
+    let errors: Vec<(String, String)> = match &preview.command {
+        Err(errs) => errs
+            .iter()
+            .map(|e| (e.flag.clone(), e.message.clone()))
+            .collect(),
+        Ok(_) => vec![],
+    };
+    let fields = preview
+        .form
+        .as_ref()
+        .map(|f| f.fields.clone())
+        .unwrap_or_default();
+    let editing = app.builder.editing.clone();
+    let selected = app.builder.field_scroll.selected;
+    let mut scratch = Vec::new();
+    draw_rows(
+        f,
+        &mut scratch,
+        Tab::Builder,
+        Some(in_form),
+        form_area,
+        format!(" sf {id} "),
+        &["Flag", "Value", "Help"],
+        &[
+            Constraint::Length(30),
+            Constraint::Fill(2),
+            Constraint::Fill(2),
+        ],
+        fields.len(),
+        &mut app.builder.field_scroll,
+        |i| {
+            let fl = &fields[i];
+            let name = format!(
+                "{}--{}{}",
+                if fl.required { "* " } else { "  " },
+                fl.flag,
+                fl.short.map(|c| format!(" (-{c})")).unwrap_or_default()
+            );
+            let v = values.get(&fl.flag).cloned().unwrap_or_default();
+            let value = match (&fl.kind, &editing) {
+                (_, Some(buf)) if i == selected && in_form => {
+                    TCell::from(format!("{buf}▏")).style(Style::new().fg(Color::Yellow))
+                }
+                (FieldKind::Bool, _) => TCell::from(if v == "true" { "[x]" } else { "[ ]" }),
+                (FieldKind::Choice(_), _) if v.is_empty() => TCell::from("(default)").style(dim()),
+                _ if v.is_empty() => TCell::from("—").style(dim()),
+                _ => TCell::from(v),
+            };
+            let help = match errors.iter().find(|(f, _)| *f == fl.flag) {
+                Some((_, m)) => TCell::from(format!("⚠ {m}")).style(Style::new().fg(Color::Red)),
+                None => TCell::from(match &fl.kind {
+                    FieldKind::Choice(o) => o.join(" | "),
+                    _ => fl.hint.to_owned(),
+                })
+                .style(dim()),
+            };
+            vec![TCell::from(name), value, help]
+        },
+    );
+    app.hits.builder_fields = scratch.first().map(|(r, _)| *r);
+
+    // Preview
+    let o = &app.builder.opts;
+    let title = format!(
+        " Command · {} · --json {} · {} flags · {} ",
+        o.shell.label(),
+        if o.json { "on" } else { "off" },
+        if o.short_flags { "short" } else { "long" },
+        if o.multiline {
+            "multi-line"
+        } else {
+            "one line"
+        }
+    );
+    let mut lines: Vec<Line> = match &preview.text {
+        Ok(t) => t
+            .lines()
+            .map(|l| Line::styled(format!(" {l}"), Style::new().fg(Color::Green)))
+            .collect(),
+        Err(e) => vec![Line::styled(format!(" {e}"), Style::new().fg(Color::Red))],
+    };
+    lines.push(Line::from(""));
+    lines.extend(
+        preview
+            .notes
+            .iter()
+            .map(|n| Line::styled(format!(" {n}"), dim())),
+    );
+    lines.push(Line::styled(
+        " c copy · R run in GP Atlas (read-only; also logged in History)",
+        dim(),
+    ));
+    f.render_widget(
+        Paragraph::new(lines)
+            .block(Block::bordered().title(title))
+            .wrap(Wrap { trim: false }),
+        prev_area,
+    );
+}
+
 /// Ancestry / Dependencies overlay over the body area.
 fn draw_graph(f: &mut Frame, app: &mut App, area: Rect) {
     let rect = area;
@@ -1274,6 +1426,48 @@ mod tests {
         assert_eq!(ids, ["04t00000000000AAAA", "04t000000000001AAA"]);
         let mut term = Terminal::new(TestBackend::new(120, 20)).unwrap();
         term.draw(|f| draw(f, &mut app)).unwrap();
+    }
+
+    /// Command Builder: prefill from the selected Dev Hub, validation, preview.
+    #[test]
+    fn command_builder_flow() {
+        use gp_atlas_core::quote::Shell;
+        let mut app = app();
+        app.tab = Tab::Builder;
+        app.builder_select_command(1); // package version list
+        app.builder.in_form = true;
+        let p = app.builder_preview();
+        assert_eq!(
+            p.text.as_deref(),
+            Ok("sf package version list --target-dev-hub fake0009")
+        );
+        // A bad branch is reported on its field and blocks the preview.
+        app.builder
+            .values
+            .get_mut("package:version:list")
+            .unwrap()
+            .insert("branch".into(), "my branch".into());
+        let p = app.builder_preview();
+        assert!(p.text.is_err());
+        assert!(matches!(&p.command, Err(e) if e[0].flag == "branch"));
+        app.builder_clear_field(); // field 0 = target-dev-hub
+        app.builder
+            .values
+            .get_mut("package:version:list")
+            .unwrap()
+            .insert("branch".into(), "main".into());
+        app.builder_prefill();
+        app.builder.opts.shell = Shell::Cmd;
+        app.builder.opts.json = true;
+        assert_eq!(
+            app.builder_preview().text.as_deref(),
+            Ok("sf package version list --target-dev-hub fake0009 --branch main --json")
+        );
+        for (w, h) in [(150, 40), (80, 24), (30, 8), (1, 1)] {
+            let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
+            term.draw(|f| draw(f, &mut app)).unwrap();
+        }
+        assert!(app.hits.builder_fields.is_some() || app.hits.builder_cmds.is_some());
     }
 
     #[test]

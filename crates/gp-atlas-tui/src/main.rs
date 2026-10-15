@@ -2,6 +2,7 @@
 
 mod aliases;
 mod app;
+mod build_tab;
 mod clip;
 mod ui;
 mod worker;

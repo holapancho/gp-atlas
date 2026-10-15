@@ -65,6 +65,18 @@ text with the mouse, hold Shift (Option on macOS) or start with `--no-mouse`.
    per package (computed by GP Atlas: numeric version, then build), `f` only
    the selected row's package (033; `f` again to clear), `x` clear filters.
 6. **History** lists every `sf` call with exit code, time and stderr.
+7. **Command Builder** (tab 8): pick a read-only command on the left; the
+   form on the right comes from the CLI's own flag list (required fields
+   marked `*`, Dev Hub / org first). Empty fields are filled from what you
+   selected elsewhere (Dev Hub, org, 2GP package or version; `f` refills).
+   `Enter` / `Space` edits a value, toggles a switch or cycles a choice;
+   `Del` clears it; invalid values show `⚠` and the reason. The preview below
+   is the exact command: `s` shell (bash/zsh, PowerShell, cmd), `J` `--json`,
+   `F` one-letter flags, `M` one flag per line, `U` alias ↔ username,
+   `A` package ID ↔ project alias (adds `cd <project>` because aliases only
+   resolve inside the project). `c` copies it; `R` runs it in GP Atlas
+   (read-only commands only; the result opens in a popup and the call goes
+   to History). Flags not offered yet are listed under the preview.
 
 Options: `--no-mouse` (select text normally), `--project <folder>` /
 `--no-project` (project aliases), `--no-cache` (Access Matrix cache),

@@ -58,6 +58,12 @@ pub enum Job {
     Pkg1 {
         org: OrgRef,
     },
+    /// A command built in the Command Builder. `cwd` is the project folder
+    /// when a project alias is used (SPEC §6.4).
+    Run {
+        cmd: Box<ReadOnlyCommand>,
+        cwd: Option<std::path::PathBuf>,
+    },
 }
 
 impl Job {
@@ -97,7 +103,15 @@ impl Job {
                 org: org.clone(),
                 package_id: None,
             },
+            Job::Run { cmd, .. } => (**cmd).clone(),
         })
+    }
+
+    fn cwd(&self) -> Option<&std::path::Path> {
+        match self {
+            Job::Run { cwd, .. } => cwd.as_deref(),
+            _ => None,
+        }
     }
 }
 
@@ -274,7 +288,7 @@ fn execute(runner: &SfRunner, manifest: &Manifest, req: Request) -> Done {
             log,
         };
     };
-    let out = match runner.run(&cmd, manifest, None, Some(&cancel)) {
+    let out = match runner.run(&cmd, manifest, job.cwd(), Some(&cancel)) {
         Ok(o) => o,
         Err(e) => {
             return Done {
