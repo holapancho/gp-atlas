@@ -48,7 +48,10 @@ text with the mouse, hold Shift (Option on macOS) or start with `--no-mouse`.
      ignored entries. `s` copies a `packageAliases` entry for the selected row,
      `S` entries for every row without an alias, named like the CLI does
      (`MyApp@1.2.0-3`). GP Atlas never edits `sfdx-project.json`.
-5. **Installed** and **1GP Versions** use the selected org.
+5. **Installed** and **1GP Versions** use the selected org. On 1GP Versions
+   (lists can have thousands of rows): `R` released only, `L` latest released
+   per package (computed by GP Atlas: numeric version, then build), `f` only
+   the selected row's package (033; `f` again to clear), `x` clear filters.
 6. **History** lists every `sf` call with exit code, time and stderr.
 
 `--no-mouse` turns off mouse capture so you can select text normally.

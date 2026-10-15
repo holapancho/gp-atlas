@@ -167,6 +167,15 @@ pub enum Cell {
     },
 }
 
+/// 1GP tab filters, computed client-side over the loaded rows.
+#[derive(Default)]
+pub struct Pkg1Filter {
+    pub released: bool,
+    pub latest: bool,
+    /// `(033, name)`.
+    pub package: Option<(String, String)>,
+}
+
 #[derive(Default)]
 pub struct VersionFilter {
     pub package: Option<(Id0Ho, String)>,
@@ -309,6 +318,7 @@ pub struct App {
     pkg_changed: Option<Instant>,
     pub installed: Panel,
     pub pkg1: Panel,
+    pub pkg1_filter: Pkg1Filter,
     pub log: Vec<LogEntry>,
     pub log_scroll: Scroll,
     pub popup: Option<Popup>,
@@ -354,6 +364,7 @@ impl App {
             pkg_changed: None,
             installed: Panel::default(),
             pkg1: Panel::default(),
+            pkg1_filter: Pkg1Filter::default(),
             log: Vec::new(),
             log_scroll: Scroll::default(),
             popup: None,
@@ -687,6 +698,9 @@ impl App {
             return;
         }
         let target = self.tab_target(tab).map(|o| o.username.clone());
+        if tab == Tab::Pkg1 && self.pkg1.for_org != target {
+            self.pkg1_filter.package = None; // a 033 of another org
+        }
         if target.is_none() {
             // Nothing selected yet: the tab shows how to pick a Dev Hub / org.
             let panel = self.panel_mut(tab).expect("data tab");
@@ -834,7 +848,8 @@ impl App {
                 Load::Ready(d) => d.rows.len() + 1, // + "All packages"
                 _ => 0,
             },
-            Tab::Installed | Tab::Pkg1 => match self.panel_ref(self.pane()).map(Panel::load) {
+            Tab::Pkg1 => self.pkg1_rows().len(),
+            Tab::Installed => match self.panel_ref(self.pane()).map(Panel::load) {
                 Some(Load::Ready(d)) => d.rows.len(),
                 _ => 0,
             },
@@ -872,11 +887,74 @@ impl App {
         }
     }
 
+    /// 1GP rows as displayed (filters applied).
+    pub fn pkg1_rows(&self) -> Vec<&Value> {
+        let Load::Ready(d) = self.pkg1.load() else {
+            return vec![];
+        };
+        let f = &self.pkg1_filter;
+        let base: Vec<&Value> = if f.latest {
+            versions::latest_released_pkg1(&d.rows)
+        } else {
+            d.rows
+                .iter()
+                .filter(|r| !f.released || versions::pkg1_is_released(r))
+                .collect()
+        };
+        match &f.package {
+            Some((id, _)) => base
+                .into_iter()
+                .filter(|r| r.get("MetadataPackageId").and_then(Value::as_str) == Some(id))
+                .collect(),
+            None => base,
+        }
+    }
+
+    fn pkg1_key(&mut self, c: char) {
+        let f = &mut self.pkg1_filter;
+        match c {
+            'R' => f.released = !f.released,
+            'L' => f.latest = !f.latest,
+            'f' if f.package.is_some() => f.package = None,
+            'f' => {
+                let Some(row) = self.selected_row() else {
+                    return;
+                };
+                let (Some(id), name) = (str_of(&row, "MetadataPackageId"), str_of(&row, "Name"))
+                else {
+                    return;
+                };
+                self.pkg1_filter.package = Some((id, name.unwrap_or_default()));
+            }
+            'x' => self.pkg1_filter = Pkg1Filter::default(),
+            _ => return,
+        }
+        self.pkg1.scroll = Scroll::default();
+        let f = &self.pkg1_filter;
+        self.status = format!(
+            "1GP: {} rows ({})",
+            self.pkg1_rows().len(),
+            match (f.latest, f.released, &f.package) {
+                (false, false, None) => "all".to_owned(),
+                _ => [
+                    f.latest.then(|| "latest released per package".to_owned()),
+                    (f.released && !f.latest).then(|| "released".to_owned()),
+                    f.package.as_ref().map(|(_, n)| format!("package: {n}")),
+                ]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join(", "),
+            }
+        );
+    }
+
     fn selected_row(&self) -> Option<Value> {
         let pane = self.pane();
         let sel = self.panel_ref(pane)?.scroll.selected;
         match pane {
             Tab::Versions => self.version_rows().get(sel).map(|v| (*v).clone()),
+            Tab::Pkg1 => self.pkg1_rows().get(sel).map(|v| (*v).clone()),
             Tab::Packages => match self.packages.load() {
                 Load::Ready(d) => d.rows.get(sel.checked_sub(1)?).cloned(),
                 _ => None,
@@ -994,6 +1072,7 @@ impl App {
         };
         match (pane, c) {
             (_, 'P') => self.show_project(),
+            (Tab::Pkg1, 'R' | 'L' | 'f' | 'x') => self.pkg1_key(c),
             (Tab::Packages | Tab::Versions, 's') => self.copy_alias_snippet(false),
             (Tab::Packages | Tab::Versions, 'S') => self.copy_alias_snippet(true),
             (_, 'c') => self.copy_id(),
@@ -1839,6 +1918,7 @@ impl App {
             "Graph view     c copy 04t  i install link  t order/tree (deps)  y copy command",
             "               Enter version details      Esc close",
             "Installed/1GP  c  copy 04t            Enter  details",
+            "1GP            R released  L latest released per package  f only this package  x clear",
             "History        c  copy command        Enter  details (exit code, stderr)",
             "",
             "GP Atlas only runs read-only sf commands. Copied commands are never run.",

@@ -177,7 +177,10 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
             Tab::Versions => {
                 "← pkgs · a ancestry · d deps · R released · L latest · V verbose · x all · c 04t · i link · s/S alias snippet · P project · Enter details"
             }
-            Tab::Installed | Tab::Pkg1 => "c / right-click copy 04t · Enter details · r refresh",
+            Tab::Installed => "c / right-click copy 04t · Enter details · r refresh",
+            Tab::Pkg1 => {
+                "R released · L latest per package · f only this package · x clear · c copy 04t · Enter details · r refresh"
+            }
             Tab::Log => "Enter details · c copy command",
         }
     };
@@ -664,8 +667,25 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<
             ],
         ),
     };
+    if tab == Tab::Pkg1 {
+        let f = &app.pkg1_filter;
+        let mut flags = Vec::new();
+        if f.latest {
+            flags.push("latest released per package (computed by GP Atlas)".to_owned());
+        } else if f.released {
+            flags.push("released".to_owned());
+        }
+        if let Some((_, name)) = &f.package {
+            flags.push(format!("package: {name}"));
+        }
+        if !flags.is_empty() {
+            title.push_str(&format!("[{}] ", flags.join(", ")));
+        }
+    }
     let rows: Vec<serde_json::Value> = if tab == Tab::Versions {
         app.version_rows().into_iter().cloned().collect()
+    } else if tab == Tab::Pkg1 {
+        app.pkg1_rows().into_iter().cloned().collect()
     } else {
         match panel.load() {
             Load::Ready(d) => d.rows.clone(),

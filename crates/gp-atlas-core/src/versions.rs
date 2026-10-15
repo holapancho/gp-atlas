@@ -48,6 +48,47 @@ pub fn latest_released(rows: &[Value]) -> Vec<&Value> {
     best.into_values().map(|(r, _)| r).collect()
 }
 
+/// 1GP (`package1 version list`): `Version` ("2.1.0") parts, then
+/// `BuildNumber`. Missing parts count as 0.
+pub fn pkg1_version_key(row: &Value) -> Option<Vec<u64>> {
+    let v = row.get("Version")?.as_str()?;
+    let mut key: Vec<u64> = v
+        .split('.')
+        .map(|p| p.parse().ok())
+        .collect::<Option<_>>()?;
+    key.resize(3, 0);
+    key.push(row.get("BuildNumber").and_then(Value::as_u64).unwrap_or(0));
+    Some(key)
+}
+
+/// 1GP `ReleaseState` is `Released` or `Beta` (owner capture).
+pub fn pkg1_is_released(row: &Value) -> bool {
+    row.get("ReleaseState")
+        .and_then(Value::as_str)
+        .is_some_and(|s| s.eq_ignore_ascii_case("Released"))
+}
+
+/// Latest released 1GP version per `MetadataPackageId` (033). Computed by
+/// GP Atlas, not by the CLI.
+pub fn latest_released_pkg1(rows: &[Value]) -> Vec<&Value> {
+    let mut best: BTreeMap<&str, (&Value, Vec<u64>)> = BTreeMap::new();
+    for row in rows.iter().filter(|r| pkg1_is_released(r)) {
+        let (Some(pkg), Some(key)) = (
+            row.get("MetadataPackageId").and_then(Value::as_str),
+            pkg1_version_key(row),
+        ) else {
+            continue;
+        };
+        match best.get(pkg) {
+            Some((_, k)) if *k >= key => {}
+            _ => {
+                best.insert(pkg, (row, key));
+            }
+        }
+    }
+    best.into_values().map(|(r, _)| r).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,5 +125,25 @@ mod tests {
     fn released_as_string() {
         assert!(is_released(&json!({"IsReleased": "true"})));
         assert!(!is_released(&json!({"IsReleased": "false"})));
+    }
+
+    #[test]
+    fn pkg1_latest_released() {
+        let r = |pkg: &str, v: &str, b: u64, state: &str| json!({"MetadataPackageId": pkg, "Version": v, "BuildNumber": b, "ReleaseState": state});
+        let rows = vec![
+            r("033A", "2.0.0", 1, "Beta"),
+            r("033A", "2.0.0", 2, "Released"),
+            r("033A", "2.10.0", 1, "Released"),
+            r("033A", "2.9.0", 3, "Released"),
+            r("033A", "3.0.0", 1, "Beta"),
+            r("033B", "1.0", 4, "Released"),
+            r("033C", "1.0.0", 1, "Beta"),
+        ];
+        let latest = latest_released_pkg1(&rows);
+        assert_eq!(latest.len(), 2);
+        assert_eq!(latest[0]["Version"], "2.10.0"); // numeric, not text, order
+        assert_eq!(latest[1]["Version"], "1.0");
+        assert_eq!(pkg1_version_key(&rows[5]), Some(vec![1, 0, 0, 4]));
+        assert!(!pkg1_is_released(&rows[0]));
     }
 }
