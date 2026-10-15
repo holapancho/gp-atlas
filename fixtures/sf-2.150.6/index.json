@@ -126,6 +126,29 @@
       ],
       "stdout": "package-version-displaydependencies.invalid-dependency-graph.json",
       "exit_code": 1
+    },
+    {
+      "argv": [
+        "package1",
+        "version",
+        "list",
+        "--target-org",
+        "ExamplePackageOrg",
+        "--json"
+      ],
+      "stdout": "package1-version-list.real.json"
+    },
+    {
+      "argv": [
+        "package1",
+        "version",
+        "list",
+        "--target-org",
+        "ExamplePackageOrgTypo",
+        "--json"
+      ],
+      "stdout": "package1-version-list.named-org-not-found.did-you-mean.json",
+      "exit_code": 2
     }
   ]
 }

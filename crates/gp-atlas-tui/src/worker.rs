@@ -118,10 +118,19 @@ impl Failure {
             state: c.state.clone(),
             rule: c.rule,
             name: c.error.as_ref().map(|e| e.name.clone()).unwrap_or_default(),
+            // The CLI's own suggestions (`actions`, e.g. "Did you mean …?")
+            // are appended so every failure view shows them.
             message: c
                 .error
                 .as_ref()
-                .map(|e| e.message.trim().to_owned())
+                .map(|e| {
+                    let mut m = e.message.trim().to_owned();
+                    for a in &e.actions {
+                        m.push_str("\nsf says: ");
+                        m.push_str(a.trim());
+                    }
+                    m
+                })
                 .unwrap_or_else(|| stderr.lines().next().unwrap_or("").to_owned()),
             stderr,
         }

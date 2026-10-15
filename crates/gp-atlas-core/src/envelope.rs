@@ -159,6 +159,38 @@ mod tests {
         }
     }
 
+    /// Real capture (sf 2.154.4): the CLI's "Did you mean …?" suggestion.
+    #[test]
+    fn parses_error_actions() {
+        match parse(&fixture(
+            "package1-version-list.named-org-not-found.did-you-mean.json",
+        ))
+        .unwrap()
+        {
+            SfOutput::Error(e) => {
+                assert_eq!(e.name, "NamedOrgNotFoundError");
+                assert_eq!(e.actions.len(), 1);
+                assert!(e.actions[0].contains("Did you mean \"ExamplePackageOrg\"?"));
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// Real capture (truncated): 1GP rows; `BuildNumber` is a number.
+    #[test]
+    fn parses_package1_versions() {
+        match parse(&fixture("package1-version-list.real.json")).unwrap() {
+            SfOutput::Success { result, .. } => {
+                let rows = result.as_array().unwrap();
+                assert_eq!(rows.len(), 3);
+                assert!(rows[0]["BuildNumber"].is_number());
+                assert_eq!(rows[0]["ReleaseState"], "Beta");
+                assert_eq!(rows[1]["Version"], rows[0]["Version"]);
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
     #[test]
     fn parses_bare_outputs() {
         assert!(matches!(

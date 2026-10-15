@@ -1,0 +1,30 @@
+{
+  "status": 0,
+  "result": [
+    {
+      "MetadataPackageVersionId": "04tXXXXXXXXXXXX001",
+      "MetadataPackageId": "033XXXXXXXXXXXX001",
+      "Name": "Example Package 2.0",
+      "ReleaseState": "Beta",
+      "Version": "2.0.0",
+      "BuildNumber": 1
+    },
+    {
+      "MetadataPackageVersionId": "04tXXXXXXXXXXXX002",
+      "MetadataPackageId": "033XXXXXXXXXXXX001",
+      "Name": "Example Package 2.0",
+      "ReleaseState": "Released",
+      "Version": "2.0.0",
+      "BuildNumber": 2
+    },
+    {
+      "MetadataPackageVersionId": "04tXXXXXXXXXXXX003",
+      "MetadataPackageId": "033XXXXXXXXXXXX001",
+      "Name": "Example Package 2.1",
+      "ReleaseState": "Released",
+      "Version": "2.1.0",
+      "BuildNumber": 1
+    }
+  ],
+  "warnings": []
+}
