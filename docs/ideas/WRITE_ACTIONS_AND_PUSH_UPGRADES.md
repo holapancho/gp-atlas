@@ -194,6 +194,34 @@ abort by setting it to `Canceled`; follow `PackagePushRequest.Status`,
 - If write mode (B) is ever built: a local, secret-free audit log of what was
   run and when; no batch operations; the read-only binary stays read-only.
 
+### 6.1 Push-upgrade checklist (from Salesforce's "Push Upgrades" overview)
+
+Source: the "Push Upgrades" overview page, pasted by the owner 2026-10-15.
+A push changes a subscriber's org **without their explicit consent**, so the
+schedule template (copy-only) should show this checklist and require it to be
+ticked before **Copy** unlocks:
+
+- [ ] Version X → Y is what you intend; orgs are one, many or all (and the
+      excluded ones are really excluded: the **Push Upgrade Exclusion List**
+      takes comma-separated org IDs; customers with customized push upgrades,
+      §5.1, may block pushes themselves).
+- [ ] **Major upgrade?** Enhancements to features users already have: a
+      post-install Apex script assigns the new components to existing users.
+      New features: do **not** auto-assign, so admins decide.
+- [ ] No changes to validation rules, formula fields or errors thrown by Apex
+      triggers that could break subscribers' integrations.
+- [ ] A **patch** has no visible changes (subscribers only see the version
+      number change).
+- [ ] Tested in environments like the customers' (editions, customizations,
+      other installed packages, permission sets).
+- [ ] Start time is the customers' off-peak hours (in **UTC** for the CLI) and
+      outside Salesforce's major release windows.
+- [ ] Subscribers were told in advance: timing, consequences, steps for them.
+
+GP Atlas can help with the facts behind the first boxes (read-only): current
+versions per subscriber (`PackageSubscriber`), whether X → Y is a major,
+minor or patch change, and the time shown in both local time and UTC.
+
 ## 7. Unknowns to capture first
 
 | ID | Unknown |
