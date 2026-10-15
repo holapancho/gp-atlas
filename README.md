@@ -33,6 +33,7 @@ specification and milestone plan.
 | Command Builder (forms from the manifest, quoting per shell) | ⏳ not started |
 | Installation-key prompt for key-protected versions | ⏳ not started |
 | Signed release builds | ⏳ not started; unsigned beta binaries come from CI |
+| Write actions (create / promote / delete versions) and push upgrades (2GP CLI, 1GP Apex) | 💡 idea only: [docs/ideas/WRITE_ACTIONS_AND_PUSH_UPGRADES.md](docs/ideas/WRITE_ACTIONS_AND_PUSH_UPGRADES.md); GP Atlas stays read-only |
 
 ## Read-only guarantee
 
