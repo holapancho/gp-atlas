@@ -169,7 +169,7 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
                 "h use as Dev Hub · o use as org · Enter select · c copy username · r refresh"
             }
             Tab::Access => {
-                "p probe org · a probe all · t try 2GP on non-hubs · ←→ column · Enter details · Esc cancel"
+                "a probe all · A re-test all · p re-test org · t try 2GP on non-hubs · ←→ column · Enter details · Esc cancel"
             }
             Tab::Packages => {
                 "↑↓/click: versions · → or Enter: go to versions · a/A ancestry · c copy 0Ho · s/S alias snippet · P project · r refresh"
@@ -454,7 +454,7 @@ fn cell_view(c: Option<&Cell>) -> (String, Style) {
 
 fn draw_access(f: &mut Frame, app: &mut App, area: Rect) {
     let title = format!(
-        " Access Matrix — p: probe org · a: all · t: try 2GP on non-hubs [{}] ",
+        " Access Matrix — a: probe all (keeps results < 15 min) · A: re-test all · p: re-test org · t: try 2GP on non-hubs [{}] ",
         if app.try_anyway { "on" } else { "off" }
     );
     let list = match &app.orgs {

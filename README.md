@@ -22,10 +22,12 @@ specification and milestone plan.
 |---|---|
 | Doctor: `sf` found, version ≥ 2.150.6, packaging plugin, command contract | ✅ |
 | Orgs: Dev Hubs and other orgs, default hub/org | ✅ |
-| Access Matrix: what each org lets you read, with reasons | ✅ (results not cached yet) |
+| Access Matrix: what each org lets you read, with reasons; results kept 15 min across restarts (`A` re-tests) | ✅ |
 | 2GP packages & versions: split view, filters, latest released, details, copy 04t / install link | ✅ |
-| 2GP ancestry tree and dependency install order (`a` / `A` / `d`) | ✅ (tested on synthetic output; real captures wanted) |
-| Installed packages, 1GP versions, History of every `sf` call | ✅ |
+| 2GP ancestry tree (`a` / `A`), checked against a real capture | ✅ |
+| 2GP dependencies in install order with "In org" (`d`); falls back to direct dependencies when `sf` cannot build the graph | ✅ (a real successful graph capture is still wanted) |
+| Installed packages, History of every `sf` call | ✅ |
+| 1GP versions with released / latest-per-package / package filters | ✅ |
 | Project aliases from `sfdx-project.json`: Alias column, orphan / duplicate / unaliased warnings, copyable `packageAliases` snippets | ✅ |
 | Copy IDs: `c` or right-click a row (OS clipboard, or the terminal's over SSH) | ✅ |
 | Command Builder (forms from the manifest, quoting per shell) | ⏳ not started |

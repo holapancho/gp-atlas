@@ -204,6 +204,8 @@ Two views of the same graph, toggled with `t`:
 - Not built yet: the installation-key prompt for key-protected versions
   (so no key ever reaches argv or History), and real captures U10, U13, U14 (U11/U12 resolved, F41/F42) —
   tests use DOT text shaped exactly like the CLI source produces.
+- Ancestry tree is compact: an only child stays in its parent's column, so a
+  long version line does not drift right; indentation grows only at forks.
 - On `InvalidDependencyGraphError` (F42) the view explains the likely
   causes and loads the direct dependencies from `package version report
   --verbose` (`SubscriberPackageVersion.Dependencies`), shown in install order

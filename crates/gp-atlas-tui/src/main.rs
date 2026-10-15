@@ -51,6 +51,10 @@ struct Cli {
     /// Do not look for sfdx-project.json.
     #[arg(long)]
     no_project: bool,
+    /// Do not read or write the Access Matrix cache (results kept 15 min in
+    /// the OS cache folder; override the folder with GP_ATLAS_CACHE_DIR).
+    #[arg(long)]
+    no_cache: bool,
 }
 
 fn main() -> ExitCode {
@@ -83,6 +87,9 @@ fn main() -> ExitCode {
             Err(_) => ProjectSource::Off,
         },
     });
+    if !cli.no_cache {
+        app.cache_path = gp_atlas_core::probe_cache::cache_file();
+    }
     app.start();
 
     // ratatui::init enables raw mode + alternate screen and restores on panic.

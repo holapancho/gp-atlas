@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 use gp_atlas_core::classify::CapState;
 use gp_atlas_core::command::{PkgVersionListArgs, ReadOnlyCommand};
@@ -12,6 +12,7 @@ use gp_atlas_core::graph::{self as dag, Graph, Node};
 use gp_atlas_core::ids::{Id0Ho, Id04t, PackageRef};
 use gp_atlas_core::manifest::Manifest;
 use gp_atlas_core::orgs::{self, Org};
+use gp_atlas_core::probe_cache::{self, CachedProbe};
 use gp_atlas_core::probes::{Capability, org_ref};
 use gp_atlas_core::versions;
 use ratatui::crossterm::event::{
@@ -164,6 +165,9 @@ pub enum Cell {
         state: CapState,
         failure: Option<Failure>,
         command: String,
+        checked: SystemTime,
+        /// Loaded from the cache file rather than probed in this session.
+        cached: bool,
     },
 }
 
@@ -307,6 +311,11 @@ pub struct App {
     pub probe_pending: usize,
     probe_cancel: Arc<AtomicBool>,
     pub try_anyway: bool,
+    /// Access Matrix cache file (AC-17); `None` disables it.
+    pub cache_path: Option<std::path::PathBuf>,
+    /// Probe results by (username, capability name), for the cache file.
+    cache_entries: HashMap<(String, String), CachedProbe>,
+    cache_loaded: bool,
     pub access_scroll: Scroll,
     pub access_col: usize,
     pub packages: Panel,
@@ -355,6 +364,9 @@ impl App {
             probe_pending: 0,
             probe_cancel: new_cancel(),
             try_anyway: false,
+            cache_path: None,
+            cache_entries: HashMap::new(),
+            cache_loaded: false,
             access_scroll: Scroll::default(),
             access_col: 0,
             packages: Panel::default(),
@@ -463,22 +475,29 @@ impl App {
             (Job::Orgs { fast }, outcome) => self.on_orgs(id, fast, outcome),
             (Job::Probe { username, cap, .. }, outcome) => {
                 self.probe_pending = self.probe_pending.saturating_sub(1);
+                let checked = SystemTime::now();
                 let cell = match outcome {
                     Outcome::Ok { .. } => Cell::Done {
                         state: CapState::Allowed,
                         failure: None,
                         command: self.last_command(),
+                        checked,
+                        cached: false,
                     },
                     Outcome::Failed(f) => Cell::Done {
                         state: f.state.clone(),
                         failure: Some(f),
                         command: self.last_command(),
+                        checked,
+                        cached: false,
                     },
                     Outcome::Cancelled | Outcome::Doctor(_) => Cell::NotRun,
                 };
+                self.remember_probe(&username, cap, &cell);
                 self.cells.insert((username, cap), cell);
                 if self.probe_pending == 0 {
                     self.status = "Access Matrix probes finished.".into();
+                    self.save_probe_cache();
                 }
             }
             (Job::Packages { .. }, o) => finish(&mut self.packages, id, o),
@@ -591,7 +610,11 @@ impl App {
                     }
                 }
                 let n = list.len();
+                // AC-17: results of orgs that are gone are dropped.
+                self.cells
+                    .retain(|(u, _), _| list.iter().any(|o| &o.username == u));
                 self.orgs = Load::Ready(list);
+                self.apply_probe_cache();
                 if fast {
                     self.status =
                         format!("{n} orgs. Checking connection status in the background…");
@@ -735,7 +758,9 @@ impl App {
 
     // ----- Access Matrix ---------------------------------------------------
 
-    fn probe_orgs(&mut self, only: Option<String>) {
+    /// Probes orgs. Without `force`, results younger than the cache TTL are
+    /// kept (AC-17); `force` (Re-test) runs everything again.
+    fn probe_orgs(&mut self, only: Option<String>, force: bool) {
         let Load::Ready(list) = &self.orgs else {
             self.status = "Orgs are not loaded yet.".into();
             return;
@@ -748,6 +773,8 @@ impl App {
         self.probe_cancel = new_cancel();
         let low = only.is_none();
         let mut queued = 0;
+        let mut kept = 0;
+        let now = SystemTime::now();
         for o in &list {
             for cap in Capability::ALL {
                 let key = (o.username.clone(), cap);
@@ -758,6 +785,16 @@ impl App {
                 };
                 if let Err(r) = applies {
                     self.cells.insert(key, Cell::NotApplicable(r));
+                    continue;
+                }
+                if !force
+                    && let Some(Cell::Done { checked, state, .. }) = self.cells.get(&key)
+                    && worth_keeping(state)
+                    && now
+                        .duration_since(*checked)
+                        .is_ok_and(|age| age < probe_cache::PROBE_TTL)
+                {
+                    kept += 1;
                     continue;
                 }
                 let Ok(target) = org_ref(o) else {
@@ -782,6 +819,8 @@ impl App {
                                 state: f.state.clone(),
                                 failure: Some(f),
                                 command: String::new(),
+                                checked: now,
+                                cached: false,
                             },
                         );
                     }
@@ -789,8 +828,128 @@ impl App {
             }
         }
         self.probe_pending += queued;
-        self.status =
-            format!("Probing: {queued} checks queued (max 3 sf processes at once). Esc cancels.");
+        self.status = match (queued, kept) {
+            (0, 0) => "Nothing to probe.".into(),
+            (0, k) => format!(
+                "All {k} results are fresh (under 15 min). A re-tests everything, p this org."
+            ),
+            (q, 0) => {
+                format!("Probing: {q} checks queued (max 3 sf processes at once). Esc cancels.")
+            }
+            (q, k) => format!(
+                "Probing: {q} checks queued, {k} fresh results kept (A re-tests all). Esc cancels."
+            ),
+        };
+    }
+
+    /// Records a probe result for the cache file.
+    fn remember_probe(&mut self, username: &str, cap: Capability, cell: &Cell) {
+        let Cell::Done {
+            state,
+            failure,
+            command,
+            checked,
+            ..
+        } = cell
+        else {
+            return;
+        };
+        if !worth_keeping(state) {
+            return;
+        }
+        let entry = CachedProbe {
+            username: username.to_owned(),
+            capability: cap.name().to_owned(),
+            state: probe_cache::encode_state(state),
+            error_name: failure.as_ref().map(|f| f.name.clone()).unwrap_or_default(),
+            message: failure
+                .as_ref()
+                .map(|f| f.message.clone())
+                .unwrap_or_default(),
+            rule: failure
+                .as_ref()
+                .map(|f| f.rule.to_owned())
+                .unwrap_or_default(),
+            command: command.clone(),
+            checked_at: probe_cache::unix_secs(*checked),
+        };
+        self.cache_entries
+            .insert((entry.username.clone(), entry.capability.clone()), entry);
+    }
+
+    fn cli_version(&self) -> Option<&str> {
+        match &self.gate {
+            Gate::Ok { version, .. } => Some(version),
+            _ => None,
+        }
+    }
+
+    fn save_probe_cache(&self) {
+        let (Some(path), Some(v)) = (&self.cache_path, self.cli_version()) else {
+            return;
+        };
+        let entries: Vec<CachedProbe> = self.cache_entries.values().cloned().collect();
+        // Best effort: a read-only cache folder must not disturb the UI.
+        let _ = probe_cache::save(path, v, &entries, SystemTime::now());
+    }
+
+    /// Shows fresh cached results for orgs that have none yet (once per run,
+    /// after the version gate and the org list).
+    fn apply_probe_cache(&mut self) {
+        if !self.cache_loaded
+            && let (Some(path), Some(v)) = (self.cache_path.clone(), self.cli_version())
+        {
+            for e in probe_cache::load(&path, v, SystemTime::now()) {
+                self.cache_entries
+                    .insert((e.username.clone(), e.capability.clone()), e);
+            }
+            self.cache_loaded = true;
+        }
+        let Load::Ready(list) = &self.orgs else {
+            return;
+        };
+        let users: Vec<String> = list.iter().map(|o| o.username.clone()).collect();
+        let mut restored = 0;
+        for u in users {
+            for cap in Capability::ALL {
+                let key = (u.clone(), cap);
+                if self.cells.contains_key(&key) {
+                    continue;
+                }
+                let Some(e) = self.cache_entries.get(&(u.clone(), cap.name().to_owned())) else {
+                    continue;
+                };
+                let Some(state) = probe_cache::decode_state(&e.state) else {
+                    continue;
+                };
+                let failure = (state != CapState::Allowed).then(|| {
+                    let mut f = Failure::simple(if e.rule.is_empty() {
+                        e.message.clone()
+                    } else {
+                        format!("{}\n(rule: {})", e.message, e.rule)
+                    });
+                    f.state = state.clone();
+                    f.name = e.error_name.clone();
+                    f
+                });
+                self.cells.insert(
+                    key,
+                    Cell::Done {
+                        state,
+                        failure,
+                        command: e.command.clone(),
+                        checked: e.checked_at(),
+                        cached: true,
+                    },
+                );
+                restored += 1;
+            }
+        }
+        if restored > 0 {
+            self.status = format!(
+                "Access Matrix: {restored} results from the last 15 min restored (A re-tests all)."
+            );
+        }
     }
 
     // ----- input -----------------------------------------------------------
@@ -1081,10 +1240,11 @@ impl App {
             (Tab::Access, 'p') => {
                 let u = self.selected_org(self.access_scroll).map(|o| o.username);
                 if u.is_some() {
-                    self.probe_orgs(u);
+                    self.probe_orgs(u, true);
                 }
             }
-            (Tab::Access, 'a') => self.probe_orgs(None),
+            (Tab::Access, 'a') => self.probe_orgs(None, false),
+            (Tab::Access, 'A') => self.probe_orgs(None, true),
             (Tab::Access, 't') => {
                 self.try_anyway = !self.try_anyway;
                 self.status = format!(
@@ -1226,8 +1386,26 @@ impl App {
                 state,
                 failure,
                 command,
+                checked,
+                cached,
             } => {
                 lines.push(format!("State:      {}", state.short()));
+                let mins = SystemTime::now()
+                    .duration_since(checked)
+                    .map_or(0, |d| d.as_secs() / 60);
+                lines.push(format!(
+                    "Checked:    {}{}",
+                    if mins == 0 {
+                        "just now".to_owned()
+                    } else {
+                        format!("{mins} min ago")
+                    },
+                    if cached {
+                        " (saved result; p re-tests this org)"
+                    } else {
+                        ""
+                    }
+                ));
                 if !command.is_empty() {
                     lines.push(format!("Command:    {command}"));
                 }
@@ -1905,7 +2083,8 @@ impl App {
             "  P                       project aliases (sfdx-project.json) and warnings",
             "",
             "Orgs           h  use as Dev Hub      o  use as target org   Enter  either",
-            "Access         p  probe this org      a  probe all orgs      t  try 2GP on non-hubs",
+            "Access         a  probe all (keeps results younger than 15 min, also across restarts)",
+            "               A  re-test all          p  re-test this org    t  try 2GP on non-hubs",
             "               ←→ choose column       Enter  details of the selected cell",
             "2GP            left: packages · right: versions of the selected package",
             "               ←/→ or click: switch pane   ↑↓/click a package: show its versions",
@@ -2102,6 +2281,16 @@ const NO_DEPENDENCY_GRAPH: &[&str] = &[
     "    stored no graph for it.",
     "Loading the direct dependencies from the version details instead…",
 ];
+
+/// Results kept for the cache TTL. Unknown states (timeouts, odd output) and
+/// network errors are transient: always probed again.
+fn worth_keeping(state: &CapState) -> bool {
+    !matches!(
+        state,
+        CapState::Unknown(_)
+            | CapState::Unreachable(gp_atlas_core::classify::UnreachableReason::Network)
+    )
+}
 
 /// First 15 characters of an id (15/18-char join).
 fn dag_key(id: &str) -> &str {

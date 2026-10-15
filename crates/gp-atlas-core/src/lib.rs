@@ -14,6 +14,7 @@ pub mod graph;
 pub mod ids;
 pub mod manifest;
 pub mod orgs;
+pub mod probe_cache;
 pub mod probes;
 pub mod project;
 pub mod runner;

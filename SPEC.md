@@ -204,7 +204,7 @@ Exact key sets and value rules per command are in F27–F30 and F33–F34; the l
 
 ### 4.7 Known unknowns — capture a real fixture before relying on any of these
 
-| ID | Unknown | Status (2026-10-03) | Action |
+| ID | Unknown | Status (2026-10-15) | Action |
 |----|---------|--------|--------|
 | U1 | Field list of each org object in `org list --json`. | 🟢 Resolved by a real capture (F36). | — |
 | U2 | JSON keys of `package version report --json`. | 🟢 Resolved from schema + unit tests (F35). | Real capture optional. |
@@ -381,6 +381,7 @@ A pool of worker threads (high/low priority queues, at most 3 concurrent `sf` pr
 
 - Settings: JSON in the OS config dir (`directories` crate): sf binary override, timeout, max rows, default shell, theme, last project dir, column choices.
 - Cache: JSON files in the OS cache dir keyed by `(cli_version, org_username, command, canonical-args-hash)`; TTL 10 min for lists, 15 min for probes; UI shows "cached N min ago ⟳". Never cache secrets (none are ever obtained).
+- **Implemented (2026-10-15), probes only:** `gp-atlas-core/src/probe_cache.rs` keeps Access Matrix results in `<OS cache dir>/gp-atlas/access-matrix.json` (`GP_ATLAS_CACHE_DIR` overrides; `--no-cache` disables), keyed by CLI version + username + capability, TTL 15 min, written atomically with mode 0600. Unknown states and network errors are not kept. `a` skips fresh results, `A` / `p` re-test (AC-17's **Re-test**); results of orgs no longer in `org list` are dropped. The cell details show "Checked N min ago (saved result)". List results are not cached (they are fast to reload with `r`). No settings file yet.
 
 ---
 

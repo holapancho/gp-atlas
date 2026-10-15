@@ -28,8 +28,17 @@ text with the mouse, hold Shift (Option on macOS) or start with `--no-mouse`.
 1. **Doctor** checks `sf` (≥ 2.150.6), then the app jumps to **Orgs**.
 2. **Orgs**: your default Dev Hub and org are preselected. Select a row and
    press `h` (use as Dev Hub) or `o` (use as target org).
-3. **Access**: `a` probes all orgs (`p` just the selected one) and shows what
-   each org lets you read; `Enter` on a cell explains the result.
+3. **Access** (the Access Matrix): one row per org, one column per thing GP
+   Atlas can read (2GP packages, 2GP versions, 2GP builds, installed
+   packages, 1GP versions). `a` probes all orgs, `A` re-tests all, `p`
+   re-tests the selected org, `Enter` on a cell explains the result (error,
+   rule, a fix to copy). Results are kept for **15 minutes**, also after you
+   close the app, so `a` only probes what is missing or older; timeouts and
+   network errors are always retried. The cache is a JSON file in your OS
+   cache folder (`~/Library/Caches/gp-atlas` on macOS, `%LOCALAPPDATA%\gp-atlas`
+   on Windows, `~/.cache/gp-atlas` on Linux; `GP_ATLAS_CACHE_DIR` overrides
+   it) holding states and the already-scrubbed error text, never tokens.
+   `--no-cache` turns it off.
 4. **2GP Packages & Versions**: packages on the left, versions on the right.
    Click a package (or move with ↑↓) to show its versions; `‹ All packages ›`
    shows everything. ←/→ or a click switches pane. Filters: `R` released,
@@ -38,7 +47,10 @@ text with the mouse, hold Shift (Option on macOS) or start with `--no-mouse`.
    - `a` **ancestry**: the package's version tree (released versions), with the
      selected version and its path to the root highlighted. `A` = whole tree.
    - `d` **dependencies**: what to install first, in install order (`t` for a
-     tree), and whether each one is already in the selected org.
+     tree), and whether each one is already in the selected org. If `sf`
+     cannot build the graph (`InvalidDependencyGraphError`, usually a
+     dependency from another publisher or Dev Hub), GP Atlas explains why and
+     shows the direct dependencies from the version details instead.
    - **Project aliases:** start `gp-atlas` inside an SFDX project (or pass
      `--project <folder>`; `--no-project` to skip). An **Alias** column then
      shows each package's and version's alias from `sfdx-project.json`
@@ -54,7 +66,9 @@ text with the mouse, hold Shift (Option on macOS) or start with `--no-mouse`.
    the selected row's package (033; `f` again to clear), `x` clear filters.
 6. **History** lists every `sf` call with exit code, time and stderr.
 
-`--no-mouse` turns off mouse capture so you can select text normally.
+Options: `--no-mouse` (select text normally), `--project <folder>` /
+`--no-project` (project aliases), `--no-cache` (Access Matrix cache),
+`--sf <path>`, `--timeout <secs>`. `gp-atlas --help` lists them all.
 
 ## Command-line debug tool (`gp-atlas-beta`)
 
