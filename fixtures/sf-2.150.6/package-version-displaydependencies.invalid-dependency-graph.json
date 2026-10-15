@@ -1,0 +1,12 @@
+{
+  "name": "InvalidDependencyGraphError",
+  "message": "Can't display package dependencies. There's an issue generating the dependency graph. Before retrying this command, make sure you added the calculateTransitiveDependencies parameter to the sfdx-project.json file and set the value to \"true\". After setting the attribute and before retrying this command, you must create a new package version.",
+  "exitCode": 1,
+  "context": "PackageVersionDisplayDependenciesCommand",
+  "stack": "InvalidDependencyGraphError: Can't display package dependencies. There's an issue generating the dependency graph. Before retrying this command, make sure you added the calculateTransitiveDependencies parameter to the sfdx-project.json file and set the value to \"true\". After setting the attribute and before retrying this command, you must create a new package version.\n    at SfCommandError.from (file:///opt/sf/node_modules/@salesforce/sf-plugins-core/lib/SfCommandError.js:48:16)\n    at PackageVersionDisplayDependenciesCommand.catch (file:///opt/sf/node_modules/@salesforce/sf-plugins-core/lib/sfCommand.js:333:47)\n    at PackageVersionDisplayDependenciesCommand._run (/opt/sf/node_modules/@oclif/core/lib/command.js:187:29)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async Config.runCommand (/opt/sf/node_modules/@oclif/core/lib/config/config.js:392:25)\n    at async run (/opt/sf/node_modules/@oclif/core/lib/main.js:95:16)\n    at async file:///opt/sf/bin/run.js:15:1",
+  "cause": "undefined",
+  "warnings": [],
+  "code": "InvalidDependencyGraphError",
+  "status": 1,
+  "commandName": "PackageVersionDisplayDependenciesCommand"
+}

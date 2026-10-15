@@ -110,6 +110,22 @@
         "--json"
       ],
       "stdout": "package-version-displayancestry.dot.no-versions.json"
+    },
+    {
+      "argv": [
+        "package",
+        "version",
+        "displaydependencies",
+        "--target-dev-hub",
+        "fake0009",
+        "--package",
+        "04tXXXXXXXXXXXX001",
+        "--edge-direction",
+        "root-last",
+        "--json"
+      ],
+      "stdout": "package-version-displaydependencies.invalid-dependency-graph.json",
+      "exit_code": 1
     }
   ]
 }

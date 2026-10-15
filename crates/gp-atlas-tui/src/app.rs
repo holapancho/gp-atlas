@@ -1412,19 +1412,14 @@ impl App {
                     "Unexpected output (not DOT): {value}"
                 )));
             }
-            Outcome::Failed(f) => {
-                if f.message.contains("calculateTransitiveDependencies")
-                    || f.message.contains("CalcTransitiveDependencies")
-                {
-                    gv.notes.push(
-                        "This version was built without transitive dependencies. To see them, add \
-                         \"calculateTransitiveDependencies\": true to its package directory in \
-                         sfdx-project.json and create a new version (GP Atlas never edits the file)."
-                            .into(),
-                    );
-                }
-                gv.failure = Some(f);
+            // AC-D5 / F42: a known state, not an error to debug.
+            Outcome::Failed(f) if is_no_dependency_graph(&f) => {
+                gv.notes = NO_DEPENDENCY_GRAPH
+                    .iter()
+                    .map(|l| (*l).to_owned())
+                    .collect();
             }
+            Outcome::Failed(f) => gv.failure = Some(f),
             Outcome::Cancelled | Outcome::Doctor(_) => {
                 gv.failure = Some(Failure::simple("Cancelled."));
             }
@@ -1880,6 +1875,28 @@ fn finish(panel: &mut Panel, id: u64, outcome: Outcome) {
     });
 }
 
+/// `InvalidDependencyGraphError` (F42): the version was built without
+/// `calculateTransitiveDependencies`, so the CLI has no graph to show.
+fn is_no_dependency_graph(f: &Failure) -> bool {
+    f.name == "InvalidDependencyGraphError" || f.message.contains("calculateTransitiveDependencies")
+}
+
+const NO_DEPENDENCY_GRAPH: &[&str] = &[
+    "No dependency graph for this version.",
+    "",
+    "It was built without \"calculateTransitiveDependencies\": true, so Salesforce did not",
+    "record its dependencies. To see them for future versions, add the setting to the",
+    "package directory in sfdx-project.json and create a new package version:",
+    "",
+    "    \"packageDirectories\": [",
+    "      { \"path\": \"force-app\", \"package\": \"MyApp\", \"versionNumber\": \"1.2.0.NEXT\",",
+    "        \"calculateTransitiveDependencies\": true }",
+    "    ]",
+    "",
+    "Existing versions cannot be changed. GP Atlas never edits sfdx-project.json.",
+    "Direct dependencies are still in the version details: Esc, then Enter on the version.",
+];
+
 pub fn str_of(v: &Value, key: &str) -> Option<String> {
     match v.get(key)? {
         Value::String(s) if !s.is_empty() => Some(s.clone()),
@@ -1939,6 +1956,31 @@ pub fn failure_lines(f: &Failure, org: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// F42, real capture: shown as an explanation, not as an error.
+    #[test]
+    fn missing_dependency_graph_is_recognised() {
+        use gp_atlas_core::envelope::{SfOutput, parse};
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+                "../../fixtures/sf-2.150.6/package-version-displaydependencies.invalid-dependency-graph.json",
+            ),
+        )
+        .unwrap();
+        let SfOutput::Error(e) = parse(&bytes).unwrap() else {
+            panic!("expected an error envelope");
+        };
+        let mut f = Failure::simple(e.message.clone());
+        f.name = e.name.clone();
+        assert!(is_no_dependency_graph(&f));
+        // Recognised by name alone too.
+        let mut by_name = Failure::simple("");
+        by_name.name = "InvalidDependencyGraphError".into();
+        assert!(is_no_dependency_graph(&by_name));
+        assert!(!is_no_dependency_graph(&Failure::simple(
+            "NamedOrgNotFound"
+        )));
+    }
 
     #[test]
     fn scroll_fit_and_move() {
