@@ -10,12 +10,12 @@ Owner's wishes, in their words: create promotable and non-promotable package
 versions; maybe build delete commands, with several warnings; push upgrades
 for 2GP through the CLI and for 1GP through Apex run from the CLI.
 
-Sources: the two pages the owner linked (2GP "Push a package upgrade with
-the CLI", 1GP "Push upgrades, customized / Apex") could **not** be fetched
-from the build environment (network policy). The 2GP facts below come from
-`plugin-packaging` 3.0.6 source and messages (the plugin bundled in sf
-2.150.6). The 1GP Apex part is from general Salesforce knowledge and **must be
-checked against the owner's link** before anything is built.
+Sources: the Salesforce docs site cannot be reached from the build
+environment, so the owner pasted the two pages (2GP "Schedule a Push Upgrade
+Using CLI" and "Enable a Package Subscriber to Restrict Push Upgrades").
+Command flags were also checked in `plugin-packaging` 3.0.6 source and
+messages (the plugin bundled in sf 2.150.6). Only §5.2 (scheduling a 1GP push)
+is still from general knowledge and must be verified.
 
 ---
 
@@ -80,65 +80,109 @@ Warnings to show before the command is even copyable:
 
 ## 4. Push upgrades — 2GP (CLI)
 
-From `plugin-packaging` 3.0.6 (`src/commands/package/push-upgrade/*`,
-`messages/package_pushupgrade_*.md`):
+Sources: Salesforce's "Schedule a Push Upgrade Using CLI" (pkg2-dev guide,
+pasted by the owner 2026-10-15) and `plugin-packaging` 3.0.6 source/messages.
 
-| Command | Changes state? | Flags |
-|---|---|---|
-| `sf package push-upgrade schedule` | **yes** (blocklisted: `schedule`) | `-v/--target-dev-hub` (required), `-p/--package <04t>` (required; target version, must be active and non-beta), `-t/--start-time` (UTC, e.g. `"2024-12-06T21:00:00"`; omitted = as soon as possible), `-l/--org-list <00D,…>` or `-f/--org-file <csv>` (one is required; one org ID per row), `--migrate-to-2gp` (push a converted 2GP onto orgs with the 1GP) |
-| `sf package push-upgrade abort` | **yes** (blocklisted: `abort`) | `-v`, `-i/--push-request-id` (required). Only `Created` or `Pending` requests can be aborted. |
-| `sf package push-upgrade list` | no | `-v`, `-p/--package <033>` (required), `-l/--scheduled-last-days`, `-s/--status` (`Created`, `Cancelled`, `Pending`, `In Progress`, `Failed`, `Succeeded`), `--show-push-migrations-only` |
-| `sf package push-upgrade report` | no | `-v`, `-i/--push-request-id` (required) |
+**Requirements:** unlocked and second-generation managed packages only.
+Managed 2GP must have passed the AppExchange (now "AgentExchange") security
+review and the partner must log a case with Partner Support to enable push
+upgrades; unlocked packages have them by default. The user needs the
+"Create and Update Second-Generation Packages" permission. Everything runs
+against the **Dev Hub that owns the package**.
 
-Preconditions from the CLI's own help: the user needs "Create and Update
-Second-Generation Packages"; for **managed** 2GP, push upgrades require a
-passed AppExchange security review and a support case to enable them;
-**unlocked** packages have them by default. Every listed org must have a
-lower version installed. Salesforce may start the job hours after the start
-time; off-peak scheduling is recommended.
+**Workflow from the guide:**
 
-**Read-only part that could come before any write mode:** `push-upgrade list`
-and `report` are read-only (already in the blocklist's allow tests). They
-could join `ReadOnlyCommand` and get a "Push upgrades" view per package
-(history, status, errors per org). That needs the commands added to the
-manifest and the contract test, like the others.
+1. **Pick the orgs.** No push-upgrade command for this; the guide uses
+   `sf data query` on the Dev Hub:
+   - all orgs with the package (033):
+     `SELECT OrgKey, OrgName, OrgType, InstanceName, MetadataPackageId, MetadataPackageVersionId FROM PackageSubscriber WHERE MetadataPackageId = '033…'`
+   - orgs on one version (04t): `… FROM PackageSubscriber WHERE MetadataPackageVersionId = '04t…'` (`--result-format csv`)
+   - orgs below a version (e.g. < 2.7), two steps: Tooling
+     `SELECT SubscriberPackageVersionId FROM Package2Version WHERE Package2Id = '0Ho…' AND (MajorVersion < 2 OR (MajorVersion = 2 AND MinorVersion < 7))`
+     (`--use-tooling-api`), then `SELECT OrgKey FROM PackageSubscriber WHERE MetadataPackageVersionId IN (…)`.
+   - The 033 and 0Ho come from `package list --verbose`; 04ts from
+     `package version list`. For `--org-file`, the CSV must contain **one
+     org ID per line and no header** (remove the first line of the query CSV).
+2. **Schedule:** `sf package push-upgrade schedule --package <04t>
+   (--org-list 00D…,00D… | --org-file orgs.csv) [--start-time "YYYY-MM-DDTHH:MM:SS"]
+   [--migrate-to-2gp] --target-dev-hub <hub>`. Start time is **UTC**; without
+   it the upgrade starts as soon as resources are available (possibly hours
+   later); schedule off-peak. The 04t must be an active, non-beta version and
+   every org must have a lower version installed.
+3. **Track:** `sf package push-upgrade list --package <033> [--scheduled-last-days N]
+   [--status Created|Cancelled|Pending|In Progress|Failed|Succeeded]
+   [--show-push-migrations-only] --target-dev-hub <hub>` shows request ID
+   (`0DV…`), version ID and number, status, scheduled start, orgs scheduled /
+   succeeded / failed, created date. `sf package push-upgrade report
+   --push-request-id <0DV> --target-dev-hub <hub>` adds error details.
+   `Failed` means it failed for one or more orgs.
+4. **Abort:** `sf package push-upgrade abort --push-request-id <0DV>`, only for
+   `Created` or `Pending` requests.
+5. **Errors per org:** `sf data query` on the Dev Hub:
+   `SELECT Id, PackagePushJobId, PackagePushJob.SubscriberOrganizationKey, ErrorDetails, ErrorMessage, ErrorSeverity, ErrorTitle, ErrorType FROM PackagePushError WHERE PackagePushJob.PackagePushRequestId = '0DV…'`
 
-GP Atlas could also help build the org list: from a subscriber list it cannot
-read today (no allow-listed command returns subscribers for 2GP); the user
-supplies the CSV. The template would validate each line as a `00D` ID.
+| Command | Changes state? |
+|---|---|
+| `package push-upgrade schedule`, `abort` | **yes** (blocklisted: `schedule`, `abort`) |
+| `package push-upgrade list`, `report` | no |
+| the `data query` SOQL above | no (but `data query` takes arbitrary SOQL, see below) |
 
-## 5. Push upgrades — 1GP (Apex through the CLI)
+**What GP Atlas could do without breaking the read-only rule** (best value
+first):
 
-1GP has no `sf package1 push-upgrade` command. Push upgrades are done with the
-packaging org's API objects, which can be driven by anonymous Apex run with
-`sf apex run --target-org <packaging org> --file push.apex`.
+- **"Who has my package" view:** subscriber orgs per package/version from
+  `PackageSubscriber` (org ID, name, type, instance, installed 04t), with a
+  version histogram and "orgs below version X". Needs `data query` added to
+  `ReadOnlyCommand` as **fixed queries only** (GP Atlas builds the SOQL from
+  validated IDs/numbers; never user-written SOQL), plus fixtures.
+- **Push history view:** `push-upgrade list` / `report` per package, and
+  per-org errors from `PackagePushError`.
+- **Org file for scheduling:** copy or save the selected subscribers' `00D`
+  IDs as a header-less CSV, ready for `--org-file` (saving a file the user
+  asks for is not an org change).
+- **Copy-only schedule/abort templates** (mode A) with the warnings of §6.
 
-From general knowledge (**verify against the linked page**):
+## 5. Push upgrades — 1GP, and "customized push upgrades" (Apex)
 
-1. Find the target version: `MetadataPackageVersion` (`Id` = 04t,
-   `ReleaseState = 'Released'`), package `MetadataPackage` (033).
-2. Find eligible subscribers: `PackageSubscriber` (`OrgKey`,
-   `MetadataPackageVersionId`, `InstalledStatus = 'i'`, `OrgType`,
-   `OrgStatus`), keeping orgs on a lower version.
-3. Insert a `PackagePushRequest` (`PackageVersionId` = target 04t,
-   `ScheduledStartTime`).
-4. Insert one `PackagePushJob` per org (`PackagePushRequestId`,
-   `SubscriberOrganizationKey`).
-5. Start it: update the request's `Status` to `Pending`. Abort: set it to
-   `Canceled`.
-6. Follow it: `PackagePushRequest.Status`, `PackagePushJob.Status`, and
-   `PackagePushError` (`ErrorMessage`, `ErrorDetails`, `ErrorSeverity`).
+### 5.1 Customized push upgrades (let a customer block pushes)
 
-Template idea: GP Atlas fills a reviewed Apex file from parameters (version,
-start time, org IDs) and shows `sf apex run --file …` to copy. The Apex text
-must be generated from validated values only (04t/033/00D patterns, ISO time),
-never from free text, and shown in full before copying.
+Source: Salesforce's "Enable a Package Subscriber to Restrict Push Upgrades"
+(pasted by the owner 2026-10-15). Applies to 1GP (run in the **1GP packaging
+org**) and managed 2GP (run in the **Dev Hub**), as a system administrator, in
+Developer Console → Execute Anonymous. Apex class
+`PushUpgradeCustomizationRepository`:
 
-Read-only parts (monitoring) would be SOQL queries on `PackagePushRequest`,
-`PackagePushJob`, `PackagePushError`, `PackageSubscriber`. GP Atlas does not
-allow `sf data query` today (it takes arbitrary SOQL). If wanted, add it as a
-**fixed** query per view inside `ReadOnlyCommand` (no user-written SOQL),
-plus fixtures.
+| Call | Effect |
+|---|---|
+| `create('<033>', '<00D>', true)` | Lets that customer org block push upgrades of that package; returns the record ID (prefix `12C`), e.g. logged as `pucId1 =12C…` |
+| `create('<033>', '<00D>', true, 90)` | Same, expiring after 90 days |
+| `setExpirationDaysForIndex('<033>', '<00D>', 100)` | Changes the expiry days for that package/org |
+| `setExpirationDaysForId('<12C…>', 120)` | Changes the expiry days for one record |
+
+One call per production org; sandboxes inherit their production org's
+setting. The **customer** then blocks pushes in Setup → Installed Packages →
+Block Push Upgrades (and can Allow Push Upgrades again); while blocked,
+upgrades are manual only. Not possible on a **patch** version (they must
+upgrade to a non-patch version first). Expiry days cannot be **decreased**
+once the customer has blocked.
+
+From the CLI the same Apex can run with `sf apex run --target-org <packaging
+org or Dev Hub> --file puc.apex` (anonymous Apex, like Execute Anonymous; to
+verify). GP Atlas could generate that file from validated `033` / `00D` /
+days values and show it, copy-only.
+
+### 5.2 Scheduling a 1GP push upgrade
+
+Not covered by the two pages above. 1GP has no `package1 push-upgrade`
+command; pushes are scheduled through API objects in the packaging org,
+which anonymous Apex or `sf data` commands can drive. From general knowledge
+(**unverified — needs the 1GP push-upgrade API page**): insert a
+`PackagePushRequest` (`PackageVersionId` = target 04t, `ScheduledStartTime`),
+insert one `PackagePushJob` per org (`PackagePushRequestId`,
+`SubscriberOrganizationKey`), then set the request `Status` to `Pending`;
+abort by setting it to `Canceled`; follow `PackagePushRequest.Status`,
+`PackagePushJob.Status` and `PackagePushError`. Subscribers come from
+`PackageSubscriber` (as in §4) and versions from `MetadataPackageVersion`.
 
 ## 6. Safety design for any write action
 
@@ -156,13 +200,17 @@ plus fixtures.
 |---|---|
 | W1 | `push-upgrade list` / `report` JSON shapes (real capture on a package with push history) |
 | W2 | Delete rules beyond "only beta versions in 2GP managed" (unlocked packages, whole packages): read the deletion-considerations page |
-| W3 | The owner's 1GP Apex page: object/field names and the start step |
+| W3 | Scheduling a **1GP** push upgrade (§5.2): the API objects/fields and the start step (Salesforce's 1GP push-upgrade API page) |
+| W5 | `sf data query` JSON for `PackageSubscriber` and `PackagePushError` on a real Dev Hub / packaging org (for the read-only views) |
+| W6 | Whether `sf apex run` output shows the `System.debug` record ID for §5.1 |
 | W4 | Whether `push-upgrade` is in `sf commands --json` of 2.150.6 with these flags (manifest/contract) |
 
 ## 8. Suggested order
 
 1. Command Builder (read-only commands), now.
-2. Read-only push-upgrade views (`list`, `report`), after W1/W4.
+2. Read-only views: "who has my package" (`PackageSubscriber`, fixed
+   queries) and push history (`push-upgrade list` / `report`,
+   `PackagePushError`), after W1/W4/W5.
 3. Copy-only templates (mode A): version create (promotable / not), promote,
    push-upgrade schedule/abort, 1GP push Apex, then delete with the §3 warnings.
 4. Only after that, and only if the owner changes rule 1: write mode (B).
