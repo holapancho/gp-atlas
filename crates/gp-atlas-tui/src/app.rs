@@ -8,7 +8,7 @@ use std::time::Instant;
 use gp_atlas_core::classify::CapState;
 use gp_atlas_core::command::{PkgVersionListArgs, ReadOnlyCommand};
 use gp_atlas_core::doctor::DoctorReport;
-use gp_atlas_core::graph::{self as dag, Graph};
+use gp_atlas_core::graph::{self as dag, Graph, Node};
 use gp_atlas_core::ids::{Id0Ho, Id04t, PackageRef};
 use gp_atlas_core::manifest::Manifest;
 use gp_atlas_core::orgs::{self, Org};
@@ -475,6 +475,14 @@ impl App {
             (Job::Installed { .. }, o) => finish(&mut self.installed, id, o),
             (Job::Pkg1 { .. }, o) => finish(&mut self.pkg1, id, o),
             (Job::Ancestry { .. } | Job::Deps { .. }, o) => self.on_graph(id, o),
+            (Job::Report { .. }, o)
+                if self
+                    .graph
+                    .as_ref()
+                    .is_some_and(|g| g.loading.map(|l| l.0) == Some(id)) =>
+            {
+                self.on_direct_deps(o)
+            }
             (Job::Report { version, .. }, o) => {
                 if let Some(p) = &mut self.popup
                     && p.loading_id == Some(id)
@@ -1320,7 +1328,9 @@ impl App {
         };
         let mut notes = vec![
             "Install from top to bottom (root-last order).".to_owned(),
-            "Needs a version built with \"calculateTransitiveDependencies\": true.".to_owned(),
+            "Full tree for versions built with \"calculateTransitiveDependencies\": true; \
+             otherwise direct dependencies only."
+                .to_owned(),
         ];
         match self.org.as_ref().map(|o| o.target().to_owned()) {
             Some(o) => {
@@ -1412,18 +1422,140 @@ impl App {
                     "Unexpected output (not DOT): {value}"
                 )));
             }
-            // AC-D5 / F42: a known state, not an error to debug.
+            // AC-D5 / F42: sf could not build the graph; fall back to the
+            // direct dependencies from `package version report --verbose`.
             Outcome::Failed(f) if is_no_dependency_graph(&f) => {
                 gv.notes = NO_DEPENDENCY_GRAPH
                     .iter()
                     .map(|l| (*l).to_owned())
                     .collect();
+                let version = gv.focus.clone().and_then(|v| Id04t::new(&v).ok());
+                let hub = self.hub.as_ref().and_then(|h| org_ref(h).ok());
+                if let (Some(version), Some(hub)) = (version, hub) {
+                    match self.submit(Job::Report { hub, version }, false, new_cancel()) {
+                        Ok((rid, _)) => {
+                            if let Some(gv) = &mut self.graph {
+                                gv.loading = Some((rid, Instant::now()));
+                            }
+                        }
+                        Err(f) => {
+                            if let Some(gv) = &mut self.graph {
+                                gv.failure = Some(f);
+                            }
+                        }
+                    }
+                }
             }
             Outcome::Failed(f) => gv.failure = Some(f),
             Outcome::Cancelled | Outcome::Doctor(_) => {
                 gv.failure = Some(Failure::simple("Cancelled."));
             }
         }
+    }
+
+    /// Fallback for F42: the version's direct dependencies, read from
+    /// `SubscriberPackageVersion.Dependencies` in `package version report
+    /// --verbose`. Works for dependencies owned by other Dev Hubs too.
+    pub(crate) fn on_direct_deps(&mut self, outcome: Outcome) {
+        let names = self.known_version_labels();
+        let Some(gv) = &mut self.graph else { return };
+        gv.loading = None;
+        let value = match outcome {
+            Outcome::Ok { value, .. } => value,
+            Outcome::Failed(f) => {
+                gv.failure = Some(f);
+                return;
+            }
+            _ => return,
+        };
+        if gv
+            .notes
+            .last()
+            .is_some_and(|l| l.starts_with("Loading the direct"))
+        {
+            gv.notes.pop();
+        }
+        let Some(me) = gv.focus.clone() else { return };
+        let deps: Vec<String> = value
+            .pointer("/SubscriberPackageVersion/Dependencies/ids")
+            .and_then(Value::as_array)
+            .map(|a| {
+                a.iter()
+                    .filter_map(|d| d.get("subscriberPackageVersionId")?.as_str())
+                    .filter(|id| Id04t::new(id).is_ok())
+                    .map(str::to_owned)
+                    .collect()
+            })
+            .unwrap_or_default();
+        let label = |id: &str| {
+            names
+                .get(dag_key(id))
+                .cloned()
+                .unwrap_or_else(|| id.to_owned())
+        };
+        let mut nodes: Vec<Node> = deps
+            .iter()
+            .map(|id| Node {
+                id: id.clone(),
+                label: label(id),
+                highlighted: true,
+            })
+            .collect();
+        nodes.push(Node {
+            id: me.clone(),
+            label: label(&me),
+            highlighted: true,
+        });
+        let edges = deps.iter().map(|d| (d.clone(), me.clone())).collect();
+        gv.notes.push(if deps.is_empty() {
+            "Version details list no dependencies for this version.".to_owned()
+        } else {
+            format!(
+                "Showing {} from the version details (package version report --verbose). \
+                 Their own dependencies are not known here.",
+                if deps.len() == 1 {
+                    "the 1 direct dependency".to_owned()
+                } else {
+                    format!("the {} direct dependencies", deps.len())
+                }
+            )
+        });
+        gv.graph = Some(Graph {
+            directed: true,
+            nodes,
+            edges,
+        });
+        if let Some(i) = gv.rows().iter().position(|r| r.id == me) {
+            gv.scroll.selected = i;
+        }
+    }
+
+    /// `Name@M.m.p.b` for 04ts GP Atlas has seen (installed list, versions list).
+    fn known_version_labels(&self) -> HashMap<String, String> {
+        let mut m = HashMap::new();
+        if let Load::Ready(d) = self.versions.load() {
+            for r in &d.rows {
+                if let (Some(id), Some(n), Some(v)) = (
+                    str_of(r, "SubscriberPackageVersionId"),
+                    str_of(r, "Package2Name"),
+                    str_of(r, "Version"),
+                ) {
+                    m.insert(dag_key(&id).to_owned(), format!("{n}@{v}"));
+                }
+            }
+        }
+        if let Load::Ready(d) = self.installed.load() {
+            for r in &d.rows {
+                if let (Some(id), Some(n), Some(v)) = (
+                    str_of(r, "SubscriberPackageVersionId"),
+                    str_of(r, "SubscriberPackageName"),
+                    str_of(r, "SubscriberPackageVersionNumber"),
+                ) {
+                    m.insert(dag_key(&id).to_owned(), format!("{n}@{v}"));
+                }
+            }
+        }
+        m
     }
 
     fn graph_key(&mut self, code: KeyCode) {
@@ -1882,20 +2014,19 @@ fn is_no_dependency_graph(f: &Failure) -> bool {
 }
 
 const NO_DEPENDENCY_GRAPH: &[&str] = &[
-    "No dependency graph for this version.",
-    "",
-    "It was built without \"calculateTransitiveDependencies\": true, so Salesforce did not",
-    "record its dependencies. To see them for future versions, add the setting to the",
-    "package directory in sfdx-project.json and create a new package version:",
-    "",
-    "    \"packageDirectories\": [",
-    "      { \"path\": \"force-app\", \"package\": \"MyApp\", \"versionNumber\": \"1.2.0.NEXT\",",
-    "        \"calculateTransitiveDependencies\": true }",
-    "    ]",
-    "",
-    "Existing versions cannot be changed. GP Atlas never edits sfdx-project.json.",
-    "Direct dependencies are still in the version details: Esc, then Enter on the version.",
+    "sf could not build the dependency graph (InvalidDependencyGraphError).",
+    "Its message always suggests calculateTransitiveDependencies, but the usual causes are:",
+    "  • a dependency belongs to a package outside this Dev Hub (another publisher,",
+    "    another Dev Hub, or a 1GP package): sf can only look up your own versions;",
+    "  • the version was built with calculateTransitiveDependencies but Salesforce",
+    "    stored no graph for it.",
+    "Loading the direct dependencies from the version details instead…",
 ];
+
+/// First 15 characters of an id (15/18-char join).
+fn dag_key(id: &str) -> &str {
+    id.get(..15).unwrap_or(id)
+}
 
 pub fn str_of(v: &Value, key: &str) -> Option<String> {
     match v.get(key)? {

@@ -1215,6 +1215,47 @@ mod tests {
         }
     }
 
+    /// F42 fallback: direct dependencies from the version report, in
+    /// install order, with the selected version last.
+    #[test]
+    fn direct_dependency_fallback() {
+        use crate::app::{GraphKind, GraphView};
+        use crate::worker::Outcome;
+        let mut app = app();
+        app.tab = Tab::Packages;
+        app.graph = Some(GraphView {
+            kind: GraphKind::Deps,
+            title: "t".into(),
+            loading: Some((7, std::time::Instant::now())),
+            graph: None,
+            failure: None,
+            focus: Some("04t000000000001AAA".into()),
+            notes: vec!["Loading the direct dependencies…".into()],
+            tree_mode: false,
+            scroll: Scroll::default(),
+            command: None,
+        });
+        app.on_direct_deps(Outcome::Ok {
+            value: serde_json::json!({"SubscriberPackageVersion": {"Dependencies": {"ids": [
+                {"subscriberPackageVersionId": "04t00000000000AAAA"},
+                {"subscriberPackageVersionId": "not-an-id"}
+            ]}}}),
+            warnings: vec![],
+        });
+        let gv = app.graph.as_ref().unwrap();
+        assert!(gv.loading.is_none());
+        assert!(!gv.notes.iter().any(|n| n.starts_with("Loading")));
+        assert!(
+            gv.notes
+                .iter()
+                .any(|n| n.contains("the 1 direct dependency"))
+        );
+        let ids: Vec<String> = gv.rows().into_iter().map(|r| r.id).collect();
+        assert_eq!(ids, ["04t00000000000AAAA", "04t000000000001AAA"]);
+        let mut term = Terminal::new(TestBackend::new(120, 20)).unwrap();
+        term.draw(|f| draw(f, &mut app)).unwrap();
+    }
+
     #[test]
     fn content_and_click_targets() {
         let mut app = app();

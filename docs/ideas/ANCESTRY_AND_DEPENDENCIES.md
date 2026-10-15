@@ -61,11 +61,15 @@ library code (`@salesforce/packaging` 5.0.7), and the plugin's real-org tests.
 - `--package` is a version (`04t…`), a version **create request** (`08c…`) or
   an alias. For an `08c` the version being built appears as a node labelled
   `<Package>@VERSION_BEING_BUILT`.
-- **Precondition:** the version must have been built with
-  `"calculateTransitiveDependencies": true` in `sfdx-project.json`. Otherwise
-  `invalidDependencyGraphError` / `noDependencyGraphJsonMustProvideVersion`
-  ("…set the value to true… you must create a new package version").
-  The graph comes from `Package2VersionCreateRequest.DependencyGraphJson`.
+- **Corrected 2026-10-15 (SPEC F43, library source):** with
+  `"calculateTransitiveDependencies": true` the graph is the full tree from
+  `Package2VersionCreateRequest.DependencyGraphJson`. Without it, a `04t`
+  still works: the CLI builds a **flat** graph of the direct dependencies
+  (`SubscriberPackageVersion.Dependencies`), with no green nodes.
+  `noDependencyGraphJsonMustProvideVersion` is only for an `08c` without it.
+  `invalidDependencyGraphError` (F42) means a node could not be resolved,
+  usually a dependency outside this Dev Hub, or a flagged version with no
+  stored graph; its message misleadingly always points at the flag.
 - Output is **always DOT**, also in `--json` (result is the string):
   `strict digraph G { node_<04t> [label="Name@M.m.p.b" …]  node_<a> -> node_<b> }`.
 - `--edge-direction root-first` (default): the root is the package installed
@@ -128,9 +132,9 @@ Two views of the same graph, toggled with `t`:
   command stays copy-only (SPEC v1.1 templates).
 - Actions: `c` copy 04t, `i` copy install link of a dependency, `g` copy the
   command that prints the DOT code.
-- Error `invalidDependencyGraphError` → friendly state: "This version was
-  built without `calculateTransitiveDependencies: true`. Rebuild with it to
-  see dependencies." Show the `sfdx-project.json` snippet as copy-only text.
+- Error `invalidDependencyGraphError` → explain the likely causes (F42) and
+  fall back to the direct dependencies from `package version report
+  --verbose` (built, see Implementation notes).
 
 ### Key-protected versions
 
@@ -200,6 +204,11 @@ Two views of the same graph, toggled with `t`:
 - Not built yet: the installation-key prompt for key-protected versions
   (so no key ever reaches argv or History), and real captures U10, U13, U14 (U11/U12 resolved, F41/F42) —
   tests use DOT text shaped exactly like the CLI source produces.
+- On `InvalidDependencyGraphError` (F42) the view explains the likely
+  causes and loads the direct dependencies from `package version report
+  --verbose` (`SubscriberPackageVersion.Dependencies`), shown in install order
+  with "In org"; labels come from the loaded version and installed lists,
+  else the 04t.
 - Code: `gp-atlas-core/src/graph.rs` (DOT parser, forest, path, install
   order, install state) and `gp-atlas-tui` (`GraphView`, jobs `Ancestry` /
   `Deps`).
