@@ -105,20 +105,73 @@ error classification and the Access Matrix. Its two jobs:
 
 ## Install
 
-**From GitHub Actions (no Rust needed):**
-open the repository's *Actions* tab → *Beta binaries* → the latest run →
-*Artifacts* → download `gp-atlas-beta-<your OS>`. Unzip it (it contains another zip; unzip that too).
+Three ways. Every code block below can be pasted as is into bash, zsh or
+PowerShell where noted (no inline `#` comments: zsh treats them as arguments
+unless `setopt interactivecomments` is on).
 
-On macOS the download is quarantined because the binary is not signed yet:
+### Download (no Rust needed)
+
+1. Open [Actions → Beta binaries](https://github.com/holapancho/gp-atlas/actions/workflows/beta.yml)
+   (you must be signed in to GitHub to download artifacts).
+2. Open the latest run with a green check, scroll to **Artifacts**, download
+   `gp-atlas-beta-macos-arm64`, `gp-atlas-beta-linux-x64` or
+   `gp-atlas-beta-windows-x64`. Artifacts are kept 30 days.
+3. Unzip it; it contains another zip: unzip that too. You get `gp-atlas`,
+   `gp-atlas-beta`, this guide and the license.
+
+macOS: the binaries are not signed yet, so remove the quarantine flag once
+(run this in the unzipped folder):
 
 ```bash
-cd ~/Downloads/gp-atlas-beta-macos-arm64     # wherever you unzipped it
 xattr -d com.apple.quarantine gp-atlas gp-atlas-beta
 chmod +x gp-atlas gp-atlas-beta
 ./gp-atlas
 ```
 
-**From source:** see [Build a debug version on another machine](#build-a-debug-version-on-another-machine).
+Windows: run `.\gp-atlas.exe` in PowerShell (SmartScreen may ask once,
+because the binary is not signed).
+
+### Clone and use
+
+An optimized build from source, for day-to-day use. Prerequisites: see
+[step 1 below](#build-a-debug-version-on-another-machine) (C linker and Rust).
+
+```bash
+git clone https://github.com/holapancho/gp-atlas.git
+cd gp-atlas
+rustup toolchain install
+cargo build --release -p gp-atlas-tui -p gp-atlas-cli
+./target/release/gp-atlas
+```
+
+To run `gp-atlas` from any folder (it lands in `~/.cargo/bin`):
+
+```bash
+cargo install --path crates/gp-atlas-tui
+cargo install --path crates/gp-atlas-cli
+gp-atlas
+```
+
+Update: `git pull`, then the same `cargo build` (or `cargo install`) lines.
+Start it inside an SFDX project folder to get the project aliases.
+
+### Clone and beta-test
+
+A debug build: readable panic backtraces, the `gp-atlas-beta` debug tool,
+and fixture capture. Full steps in
+[Build a debug version on another machine](#build-a-debug-version-on-another-machine);
+in short:
+
+```bash
+git clone https://github.com/holapancho/gp-atlas.git
+cd gp-atlas
+rustup toolchain install
+cargo build -p gp-atlas-tui -p gp-atlas-cli
+RUST_BACKTRACE=1 ./target/debug/gp-atlas
+```
+
+Then, to report something: `./target/debug/gp-atlas-beta --debug doctor`, or
+[help with the missing fixtures](#helping-with-the-missing-fixtures).
 
 ## Build a debug version on another machine
 
@@ -138,11 +191,14 @@ Plus `git`, Node.js ≥ 22 and `sf` ≥ 2.150.6 (`npm install --global @salesfor
 **2. Get the code and build**
 
 ```bash
-git clone https://github.com/holapancho/gp-atlas
+git clone https://github.com/holapancho/gp-atlas.git
 cd gp-atlas
-rustup toolchain install          # installs the pinned Rust (rust-toolchain.toml)
-cargo build -p gp-atlas-tui -p gp-atlas-cli   # debug build (default profile)
+rustup toolchain install
+cargo build -p gp-atlas-tui -p gp-atlas-cli
 ```
+
+`rustup toolchain install` installs the pinned Rust (`rust-toolchain.toml`);
+`cargo build` without `--release` is the debug build.
 
 The programs are `target/debug/gp-atlas` and `target/debug/gp-atlas-beta`
 (`.exe` on Windows). If the repository is private, clone with an account that has
@@ -150,17 +206,20 @@ access (`gh auth login`, or an SSH key).
 
 **3. Run with debugging on**
 
+macOS / Linux (the History tab in the UI shows every `sf` call; the last
+line builds and runs the debug tool in one step):
+
 ```bash
-# macOS / Linux
-RUST_BACKTRACE=1 ./target/debug/gp-atlas          # clickable UI; History tab shows every sf call
+RUST_BACKTRACE=1 ./target/debug/gp-atlas
 RUST_BACKTRACE=1 ./target/debug/gp-atlas-beta --debug doctor
-# or build-and-run in one step
 RUST_BACKTRACE=1 cargo run -p gp-atlas-cli -- --debug orgs
 ```
 
+Windows PowerShell:
+
 ```powershell
-# Windows PowerShell
 $env:RUST_BACKTRACE = "1"
+.\target\debug\gp-atlas.exe
 .\target\debug\gp-atlas-beta.exe --debug doctor
 ```
 
@@ -178,10 +237,13 @@ git pull && cargo build -p gp-atlas-tui -p gp-atlas-cli
 
 **5. Optional: run the test suite on that machine**
 
+Unit and fake-`sf` tests (no org needed), then the contract tests against
+`sf` 2.150.6 exactly, then against any newer `sf`:
+
 ```bash
-cargo test                                            # unit + fake-sf tests, no org needed
-cargo test -p gp-atlas-contract-tests -- --ignored    # needs sf 2.150.6 exactly
-GP_ATLAS_CONTRACT_MODE=compat cargo test -p gp-atlas-contract-tests -- --ignored   # any newer sf
+cargo test
+cargo test -p gp-atlas-contract-tests -- --ignored
+GP_ATLAS_CONTRACT_MODE=compat cargo test -p gp-atlas-contract-tests -- --ignored
 ```
 
 A release (optimized) build is `cargo build --release -p gp-atlas-tui -p gp-atlas-cli`

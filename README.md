@@ -14,9 +14,33 @@ build exact, correctly quoted `sf` commands to copy and run themselves.
 
 **Status:** beta. The app is the clickable **terminal UI** (`gp-atlas`:
 mouse and keyboard). A command-line debug tool (`gp-atlas-beta`) runs on the
-same core. See [`docs/BETA.md`](docs/BETA.md) to
-download or build and try it, and [`SPEC.md`](SPEC.md) for the full
-specification and milestone plan.
+same core. [`docs/BETA.md`](docs/BETA.md) is the user guide;
+[`SPEC.md`](SPEC.md) is the full specification and milestone plan.
+
+## Quick start
+
+You need the Salesforce CLI **2.150.6 or newer** (`sf version`) and at least
+one org you are logged in to (`sf org list`). Pick one way:
+
+| I want to… | Do this |
+|---|---|
+| **Use it, no Rust** | [Download the beta binaries](https://github.com/holapancho/gp-atlas/actions/workflows/beta.yml) → latest green run → *Artifacts* → `gp-atlas-beta-<your OS>` ([details](docs/BETA.md#download-no-rust-needed)) |
+| **Clone and use** (optimized build) | [Clone and use](docs/BETA.md#clone-and-use) |
+| **Clone and beta-test** (debug build, backtraces, debug tool) | [Clone and beta-test](docs/BETA.md#clone-and-beta-test) |
+
+Clone and use, in short (needs [Rust](https://rustup.rs) and `git`):
+
+```bash
+git clone https://github.com/holapancho/gp-atlas.git
+cd gp-atlas
+cargo build --release -p gp-atlas-tui -p gp-atlas-cli
+./target/release/gp-atlas
+```
+
+On Windows run `.\target\release\gp-atlas.exe`. Inside the app: `1` Doctor
+checks `sf`, `2` Orgs (`h` picks the Dev Hub, `o` the org), `4` packages and
+versions, `8` Command Builder, `?` all keys, `q` quits. Update later with
+`git pull` and the same `cargo build` line.
 
 | Area | State |
 |---|---|
