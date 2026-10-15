@@ -1,4 +1,4 @@
-//! `gp-atlas-tui`: clickable terminal UI for GP Atlas (read-only).
+//! `gp-atlas`: clickable terminal UI for GP Atlas (read-only).
 
 mod aliases;
 mod app;
@@ -24,7 +24,7 @@ use crate::worker::Pool;
 
 #[derive(Parser)]
 #[command(
-    name = "gp-atlas-tui",
+    name = "gp-atlas",
     version,
     about = "GP Atlas terminal UI: browse 1GP/2GP package versions through your installed sf (read-only).",
     long_about = "GP Atlas terminal UI. Read-only companion to the Salesforce CLI (sf 2.150.6 or newer).\n\

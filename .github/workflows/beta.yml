@@ -1,6 +1,6 @@
 name: Beta binaries
 
-# Builds the beta binaries for manual testing: `gp-atlas-tui` (clickable
+# Builds the beta binaries for manual testing: `gp-atlas` (clickable
 # terminal UI) and `gp-atlas-beta` (command-line debug tool + fixture capture).
 # Download from the run's "Artifacts" section.
 
@@ -42,7 +42,7 @@ jobs:
         shell: bash
         run: |
           mkdir dist
-          cp "target/release/gp-atlas-tui${{ matrix.ext }}" "target/release/gp-atlas-beta${{ matrix.ext }}" dist/
+          cp "target/release/gp-atlas${{ matrix.ext }}" "target/release/gp-atlas-beta${{ matrix.ext }}" dist/
           cp docs/BETA.md LICENSE dist/
           # Zip keeps the executable bit (upload-artifact alone does not).
           cd dist

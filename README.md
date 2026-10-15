@@ -12,7 +12,7 @@ build exact, correctly quoted `sf` commands to copy and run themselves.
 > marks are trademarks of Salesforce, Inc. GP Atlas is an independent tool that
 > uses your locally installed Salesforce CLI as its only data source.
 
-**Status:** beta. The app is the clickable **terminal UI** (`gp-atlas-tui`:
+**Status:** beta. The app is the clickable **terminal UI** (`gp-atlas`:
 mouse and keyboard). A command-line debug tool (`gp-atlas-beta`) runs on the
 same core. See [`docs/BETA.md`](docs/BETA.md) to
 download or build and try it, and [`SPEC.md`](SPEC.md) for the full
@@ -75,7 +75,7 @@ cargo test
 | Path | Purpose |
 |---|---|
 | `crates/gp-atlas-core` | UI-free core: CLI contract, manifest, blocklist, validated inputs, `ReadOnlyCommand`, runner, JSON parsing and secret scrubbing, error classification, Doctor, orgs, probes. |
-| `crates/gp-atlas-tui` | `gp-atlas-tui`: clickable terminal UI (ratatui). |
+| `crates/gp-atlas-tui` | `gp-atlas`: clickable terminal UI (ratatui). |
 | `crates/gp-atlas-cli` | `gp-atlas-beta`: command-line debug frontend and sanitized fixture capture ([docs/BETA.md](docs/BETA.md)). |
 | `manifest/sf-2.150.6.json` | **Generated** from `sf commands --json`. Never edit it by hand. |
 | `tools/extract-manifest` | Regenerates the baseline manifest from an installed `sf` 2.150.6. |

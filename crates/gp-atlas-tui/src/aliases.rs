@@ -156,7 +156,7 @@ pub fn report_lines(
                     printable(&d.display().to_string())
                 ),
                 String::new(),
-                "Start gp-atlas-tui inside an SFDX project folder, or pass".into(),
+                "Start gp-atlas inside an SFDX project folder, or pass".into(),
                 "--project <folder>, to show the project's package aliases.".into(),
             ];
         }

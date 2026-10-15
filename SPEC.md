@@ -30,7 +30,7 @@ You are a senior Rust engineer building **GP Atlas**: a small, cross-platform **
 **Interpretation notes (decisions already made — don't re-litigate):**
 
 - UI: a **clickable terminal UI** (ratatui + crossterm: mouse and keyboard, virtualized tables). **Decision 2026-10-12 (owner): no desktop/egui app.** Where this spec mentions windows, buttons, dropdowns or tooltips, the TUI equivalent applies (tabs, keys, popups, status line). All logic lives in the UI-free core crate.
-- Binaries: `gp-atlas-tui` (the product) and `gp-atlas-beta` (command-line debug tool). Crate names: `gp-atlas-core`, `gp-atlas-tui`, `gp-atlas-cli`.
+- Binaries: `gp-atlas` (the product, crate `gp-atlas-tui`) and `gp-atlas-beta` (command-line debug tool). Crate names: `gp-atlas-core`, `gp-atlas-tui`, `gp-atlas-cli`.
 - License: `MIT`. README must say "Not affiliated with or endorsed by Salesforce." Do not use "Salesforce" or "sf" as part of the product name.
 
 ---
@@ -138,6 +138,7 @@ Binary resolution order: `GP_ATLAS_SF_BIN` env var → setting in app config →
 | F38 | An org that no longer resolves (deleted scratch org, expired trial, refreshed sandbox, changed domain) makes data commands fail with `name: "ERROR_HTTP_420"`, `code: "1"`, `exitCode: 1`, message "HTTP response contains html content. Check that the org exists and can be reached. HTTP status code: 420…"; `data`, `stack` and `cause` are printed as `"hidden"`. `org list` shows the same text as `connectedStatus` (F36). Classified `Unreachable(OrgUnavailable)`. | Owner's capture `fixtures/sf-2.150.6/package-installed-list.http-420.json`. |
 | F39 | `displayancestry --json` (no `--dot-code`) returns only `children[0]` of the producer, i.e. **the first root** for a package (`0Ho`) with several roots; for a version (`04t`) it returns that version and its **descendants**, not its ancestors. `--dot-code` lists **all** released versions of all roots with parent→child edges (`node<04t> [label="M.m.p.b"]`, `node<a> -- node<b>`). `displaydependencies` always returns DOT (`node_<04t> [label="Name@M.m.p.b"( color="green")]`, green = selected version and its direct dependencies; root-last edges `node_<a> -> node_<b>` = install a before b). GP Atlas therefore uses `--dot-code` for ancestry and computes the path to the root itself. | Installed `@salesforce/packaging` 5.0.7 `lib/package/packageAncestry.js`, `packageVersionDependency.js`. |
 | F40 | When the CLI writes a version alias (`package version create` / `promote` update `packageAliases`), the key is `<first alias of the 0Ho, else the package Name>@<major>.<minor>.<patch>-<build>[-<branch>]` (build omitted when 0/empty). | `@salesforce/packaging` `src/package/packageVersion.ts` (promote) and `src/utils/packageUtils.ts` `generatePackageAliasEntry`. |
+| F41 | `displayancestry --package <0Ho> --dot-code --json` returns the DOT as the `result` string and adds a synthetic node `nodeunknown [label="root"]` linked to the first released version (`nodeunknown -- node<04t>`). A package with no released versions returns only that node. GP Atlas drops it; it is not a version. | Owner capture 2026-10-15, `fixtures/sf-2.150.6/package-version-displayancestry.dot*.json`. |
 
 ### 4.4 Command manifest (allow-list)
 
@@ -338,7 +339,7 @@ gp-atlas/
 └─ crates/
    ├─ gp-atlas-core/             # NO UI dependencies
    │  └─ src/{runner,manifest,envelope,doctor,orgs,probes,classify,project,aliases,builder,quote,cache,models/}.rs
-   ├─ gp-atlas-tui/              # binary `gp-atlas-tui` (clickable terminal UI, the product)
+   ├─ gp-atlas-tui/              # binary `gp-atlas` (clickable terminal UI, the product)
    └─ gp-atlas-cli/              # binary `gp-atlas-beta` (debug tool, fixture capture)
 ```
 

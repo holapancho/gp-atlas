@@ -1,0 +1,5 @@
+{
+  "status": 0,
+  "result": "strict graph G {\n\t nodeunknown [label=\"root\"]\n}",
+  "warnings": []
+}

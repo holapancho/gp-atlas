@@ -13,6 +13,8 @@ fixture files for `tests/fake-sf`.
 | `org-list-skip.derived.json` | **Derived**, not captured: `org-list.real.json` with every `connectedStatus` removed, which is what `--skip-connection-status` omits (F26). Served for `org list --skip-connection-status --json`. Replace with a real capture when available. | 0 |
 | `package-list.real.json` | `sf package list --target-dev-hub <hub> --json` against the owner's default Dev Hub (11 packages: 10 managed, 1 unlocked). The `--verbose` capture was byte-identical, so `index.json` serves this file for both. Owner-sanitized; the hub is served under its sanitized alias `fake0009` from `org-list.real.json`. | 0 |
 | `package-installed-list.http-420.json` | `sf package installed list --target-org <org> --json` against an org that no longer resolves; captured by the project owner (org name removed; the CLI itself printed `data`/`stack`/`cause` as `"hidden"`) | 1 |
+| `package-version-displayancestry.dot.json` | `sf package version displayancestry --target-dev-hub <hub> --package <0Ho> --dot-code --json` on a managed package with 18 released versions and an early fork (1.0.0.1 → 1.1.0.1 and 1.2.0.1). Owner capture, IDs replaced with `04tXXXXXXXXXXXX001`…; served for package `0HoXXXXXXXXXXXXAAA` on `fake0009`. Shows the synthetic `nodeunknown [label="root"]` node (F41). | 0 |
+| `package-version-displayancestry.dot.no-versions.json` | Same command on a package with no released versions: only the synthetic root node (F41). Served for `0HoXXXXXXXXXXXXBBB`. | 0 |
 | `package-list.named-org-not-found.json` | `sf package list -v nobody@example.com --json` | 2 |
 | `package1-version-list.named-org-not-found.json` | `sf package1 version list -o nobody@example.com --json` | 2 |
 

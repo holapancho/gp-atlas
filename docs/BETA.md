@@ -4,14 +4,14 @@ Two programs, both read-only and built on the same core:
 
 | Program | What it is |
 |---|---|
-| **`gp-atlas-tui`** | The **clickable terminal UI**: tabs, tables, popups. Use this day to day. |
+| **`gp-atlas`** | The **clickable terminal UI**: tabs, tables, popups. Use this day to day. |
 | `gp-atlas-beta` | Command-line debug tool: one command per action, `--debug`, and `capture` for fixtures. |
 
-## Terminal UI (`gp-atlas-tui`)
+## Terminal UI (`gp-atlas`)
 
 ```bash
-./target/debug/gp-atlas-tui            # if you built it yourself (see below)
-./gp-atlas-tui                         # if you downloaded it
+./target/debug/gp-atlas            # if you built it yourself (see below)
+./gp-atlas                         # if you downloaded it
 ```
 
 It opens full-screen in your terminal. Click a tab or a row (click the selected
@@ -39,7 +39,7 @@ text with the mouse, hold Shift (Option on macOS) or start with `--no-mouse`.
      selected version and its path to the root highlighted. `A` = whole tree.
    - `d` **dependencies**: what to install first, in install order (`t` for a
      tree), and whether each one is already in the selected org.
-   - **Project aliases:** start `gp-atlas-tui` inside an SFDX project (or pass
+   - **Project aliases:** start `gp-atlas` inside an SFDX project (or pass
      `--project <folder>`; `--no-project` to skip). An **Alias** column then
      shows each package's and version's alias from `sfdx-project.json`
      (yellow: several aliases, or the CLI disagrees). The header shows
@@ -84,9 +84,9 @@ On macOS the download is quarantined because the binary is not signed yet:
 
 ```bash
 cd ~/Downloads/gp-atlas-beta-macos-arm64     # wherever you unzipped it
-xattr -d com.apple.quarantine gp-atlas-tui gp-atlas-beta
-chmod +x gp-atlas-tui gp-atlas-beta
-./gp-atlas-tui
+xattr -d com.apple.quarantine gp-atlas gp-atlas-beta
+chmod +x gp-atlas gp-atlas-beta
+./gp-atlas
 ```
 
 **From source:** see [Build a debug version on another machine](#build-a-debug-version-on-another-machine).
@@ -115,7 +115,7 @@ rustup toolchain install          # installs the pinned Rust (rust-toolchain.tom
 cargo build -p gp-atlas-tui -p gp-atlas-cli   # debug build (default profile)
 ```
 
-The programs are `target/debug/gp-atlas-tui` and `target/debug/gp-atlas-beta`
+The programs are `target/debug/gp-atlas` and `target/debug/gp-atlas-beta`
 (`.exe` on Windows). If the repository is private, clone with an account that has
 access (`gh auth login`, or an SSH key).
 
@@ -123,7 +123,7 @@ access (`gh auth login`, or an SSH key).
 
 ```bash
 # macOS / Linux
-RUST_BACKTRACE=1 ./target/debug/gp-atlas-tui          # clickable UI; History tab shows every sf call
+RUST_BACKTRACE=1 ./target/debug/gp-atlas          # clickable UI; History tab shows every sf call
 RUST_BACKTRACE=1 ./target/debug/gp-atlas-beta --debug doctor
 # or build-and-run in one step
 RUST_BACKTRACE=1 cargo run -p gp-atlas-cli -- --debug orgs

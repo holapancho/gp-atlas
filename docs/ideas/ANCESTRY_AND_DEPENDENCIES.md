@@ -1,6 +1,6 @@
 # Idea: Ancestry & Dependencies views
 
-Status: **built in `gp-atlas-tui`** (2026-10-05), except the installation-key
+Status: **built in `gp-atlas`** (crate `gp-atlas-tui`) (2026-10-05), except the installation-key
 prompt (§3, "Key-protected versions"). See "Implementation
 notes" at the end for what differs from this draft.
 
@@ -157,7 +157,7 @@ Two views of the same graph, toggled with `t`:
 |---|---|---|
 | U10 | Real `displaydependencies --json` output with and without `--verbose` (exact label format, extra node attributes, how the selected node is marked) | `gp-atlas-beta`/`sf` on a version built with `calculateTransitiveDependencies: true` |
 | U11 | Error envelope when the version was built **without** transitive dependencies | Same, on an older version |
-| U12 | Ancestry JSON for a **whole package** (`--package 0Ho`) with several roots / patch branches | Capture on a managed package with history |
+| U12 | Ancestry for a **whole package** (`--package 0Ho`) | 🟢 Resolved by a real `--dot-code` capture (SPEC F41): synthetic `nodeunknown` root, early fork, 18 versions. A package with several roots or patch branches is still welcome. |
 | U13 | Behaviour with an `08c` still in progress (`VERSION_BEING_BUILT`) | Capture during a build |
 | U14 | Installation-key flow: error name when the key is missing or wrong | Capture on a protected version (key never written to fixtures) |
 
@@ -198,7 +198,7 @@ Two views of the same graph, toggled with `t`:
   org's `package installed list` (by 04t, else by package name and numeric
   version). Unreleased versions get a note with their `AncestorVersion`.
 - Not built yet: the installation-key prompt for key-protected versions
-  (so no key ever reaches argv or History), and real captures U10–U14 —
+  (so no key ever reaches argv or History), and real captures U10, U11, U13, U14 (U12 resolved, F41) —
   tests use DOT text shaped exactly like the CLI source produces.
 - Code: `gp-atlas-core/src/graph.rs` (DOT parser, forest, path, install
   order, install state) and `gp-atlas-tui` (`GraphView`, jobs `Ancestry` /

@@ -233,12 +233,12 @@ impl GraphView {
         };
         match (self.kind, self.tree_mode) {
             (GraphKind::Ancestry, _) => g
-                .forest(false)
+                .forest(false, true)
                 .into_iter()
                 .map(|l| row(l.prefix, &l.id))
                 .collect(),
             (GraphKind::Deps, true) => g
-                .forest(true)
+                .forest(true, false)
                 .into_iter()
                 .map(|l| row(l.prefix, &l.id))
                 .collect(),
@@ -249,7 +249,7 @@ impl GraphView {
                     .map(|(i, n)| row(format!("{:>2}. ", i + 1), &n.id))
                     .collect(),
                 Err(_) => g
-                    .forest(true)
+                    .forest(true, false)
                     .into_iter()
                     .map(|l| row(l.prefix, &l.id))
                     .collect(),
@@ -1387,6 +1387,12 @@ impl App {
                         && gv.focus.as_ref().is_some_and(|f| g.node(f).is_none())
                     {
                         gv.focus = None;
+                    }
+                    if gv.kind == GraphKind::Ancestry && g.nodes.is_empty() {
+                        gv.notes.push(
+                            "No released versions yet: ancestry only includes released versions."
+                                .into(),
+                        );
                     }
                     if gv.kind == GraphKind::Deps && g.nodes.len() <= 1 {
                         gv.notes

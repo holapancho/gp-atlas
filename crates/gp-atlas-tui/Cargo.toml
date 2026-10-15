@@ -9,7 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [[bin]]
-name = "gp-atlas-tui"
+name = "gp-atlas"
 path = "src/main.rs"
 
 [dependencies]

@@ -7,7 +7,10 @@
 //! * `displayancestry --dot-code`: `strict graph G {` with nodes
 //!   `node<04t> [label="M.m.p.b"]` and parent→child edges `node<a> -- node<b>`.
 //!   For a package (0Ho) it contains **every root** (the JSON form keeps only
-//!   the first root), released versions only.
+//!   the first root), released versions only. A synthetic
+//!   `nodeunknown [label="root"]` is linked to the first version, and is the
+//!   only node when nothing is released (F41, real capture); the parser drops
+//!   it so the real roots are the tree roots.
 //! * `displaydependencies --edge-direction root-last`: `strict digraph G {`
 //!   with nodes `node_<04t> [label="Name@M.m.p.b" color="green"]` and edges
 //!   `node_<a> -> node_<b>` meaning *a is installed before b*.
@@ -41,6 +44,9 @@ pub enum GraphError {
     #[error("the dependency graph has a cycle")]
     Cycle,
 }
+
+/// `nodeunknown [label="root"]` in `displayancestry --dot-code` (F41).
+const SYNTHETIC_ROOT: &str = "unknown";
 
 fn node_id(token: &str) -> Option<&str> {
     let t = token.trim();
@@ -94,6 +100,11 @@ pub fn parse_dot(dot: &str) -> Result<Graph, GraphError> {
         } else {
             return Err(GraphError::Format(line.to_owned()));
         }
+    }
+    if !directed {
+        // F41: the CLI's synthetic root is not a version.
+        nodes.retain(|n| n.id != SYNTHETIC_ROOT);
+        edges.retain(|(a, b)| a != SYNTHETIC_ROOT && b != SYNTHETIC_ROOT);
     }
     // Edges may mention nodes without a node line; add them with their id as label.
     for (a, b) in &edges {
@@ -152,15 +163,16 @@ impl Graph {
     }
 
     /// Renders the graph as a forest. `reverse` flips edge direction (used to
-    /// show dependencies from the selected package down).
-    pub fn forest(&self, reverse: bool) -> Vec<TreeLine> {
+    /// show dependencies from the selected package down). `compact` keeps an
+    /// only child in its parent's column, so a long version line stays
+    /// readable and indentation grows only at forks.
+    pub fn forest(&self, reverse: bool, compact: bool) -> Vec<TreeLine> {
         let children = self.children_map(reverse);
         let mut out = Vec::new();
         let mut seen = HashSet::new();
         let roots = self.roots(reverse);
-        let n = roots.len();
-        for (i, r) in roots.iter().enumerate() {
-            walk(r, "", i + 1 == n, 0, &children, &mut seen, &mut out, true);
+        for r in &roots {
+            walk(r, "", "", 0, &children, &mut seen, &mut out, compact);
         }
         out
     }
@@ -251,20 +263,13 @@ impl Graph {
 fn walk<'a>(
     id: &'a str,
     indent: &str,
-    last: bool,
+    branch: &str,
     depth: usize,
     children: &HashMap<&'a str, Vec<&'a str>>,
     seen: &mut HashSet<&'a str>,
     out: &mut Vec<TreeLine>,
-    top: bool,
+    compact: bool,
 ) {
-    let branch = if top {
-        ""
-    } else if last {
-        "└─ "
-    } else {
-        "├─ "
-    };
     out.push(TreeLine {
         prefix: format!("{indent}{branch}"),
         depth,
@@ -273,15 +278,23 @@ fn walk<'a>(
     if !seen.insert(id) {
         return; // shared sub-graph already shown above
     }
-    let next = if top {
-        String::new()
-    } else {
-        format!("{indent}{}", if last { "   " } else { "│  " })
-    };
+    let next = format!(
+        "{indent}{}",
+        match branch {
+            "" => "",
+            "└─ " => "   ",
+            _ => "│  ",
+        }
+    );
     let kids = children.get(id).cloned().unwrap_or_default();
+    if compact && kids.len() == 1 {
+        walk(kids[0], &next, "", depth + 1, children, seen, out, compact);
+        return;
+    }
     let n = kids.len();
     for (i, k) in kids.iter().enumerate() {
-        walk(k, &next, i + 1 == n, depth + 1, children, seen, out, false);
+        let b = if i + 1 == n { "└─ " } else { "├─ " };
+        walk(k, &next, b, depth + 1, children, seen, out, compact);
     }
 }
 
@@ -350,7 +363,7 @@ mod tests {
         assert!(!g.directed);
         assert_eq!(g.nodes.len(), 5);
         let lines: Vec<String> = g
-            .forest(false)
+            .forest(false, false)
             .iter()
             .map(|l| format!("{}{}", l.prefix, g.node(&l.id).unwrap().label))
             .collect();
@@ -376,6 +389,66 @@ mod tests {
         assert!(g.path_to_root("04tMISSING").is_empty());
     }
 
+    fn fixture_dot(name: &str) -> String {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/sf-2.150.6")
+            .join(name);
+        match crate::envelope::parse(&std::fs::read(path).unwrap()).unwrap() {
+            crate::envelope::SfOutput::Success { result, .. } => {
+                result.as_str().unwrap().to_owned()
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// Real capture (owner, IDs replaced): synthetic root dropped, early fork.
+    #[test]
+    fn real_ancestry_capture() {
+        let g = parse_dot(&fixture_dot("package-version-displayancestry.dot.json")).unwrap();
+        assert_eq!(g.nodes.len(), 18);
+        assert!(g.node("unknown").is_none());
+        assert_eq!(g.edges.len(), 17);
+        let lines: Vec<String> = g
+            .forest(false, false)
+            .iter()
+            .map(|l| format!("{}{}", l.prefix, g.node(&l.id).unwrap().label))
+            .collect();
+        assert_eq!(lines.len(), 18);
+        assert_eq!(
+            &lines[..4],
+            ["1.0.0.1", "├─ 1.1.0.1", "└─ 1.2.0.1", "   └─ 1.3.0.1"]
+        );
+        assert_eq!(lines[17].trim_start_matches([' ', '└', '─']), "1.17.0.3");
+        let path = g.path_to_root("04tXXXXXXXXXXXX018");
+        assert_eq!(path.len(), 17); // 1.17 … 1.2, 1.0 (1.1 is a side branch)
+        assert_eq!(path.last().map(String::as_str), Some("04tXXXXXXXXXXXX001"));
+        assert_eq!(g.child_count("04tXXXXXXXXXXXX001"), 2);
+
+        // Compact: indentation grows only at the fork.
+        let compact: Vec<String> = g
+            .forest(false, true)
+            .iter()
+            .map(|l| format!("{}{}", l.prefix, g.node(&l.id).unwrap().label))
+            .collect();
+        assert_eq!(
+            &compact[..5],
+            [
+                "1.0.0.1",
+                "├─ 1.1.0.1",
+                "└─ 1.2.0.1",
+                "   1.3.0.1",
+                "   1.4.0.2"
+            ]
+        );
+        assert_eq!(compact[17], "   1.17.0.3");
+
+        let empty = parse_dot(&fixture_dot(
+            "package-version-displayancestry.dot.no-versions.json",
+        ))
+        .unwrap();
+        assert!(empty.nodes.is_empty() && empty.edges.is_empty());
+    }
+
     #[test]
     fn dependency_install_order_and_tree() {
         let g = parse_dot(DEPS).unwrap();
@@ -391,7 +464,7 @@ mod tests {
         assert!(!g.node("04tBASE0000000001").unwrap().highlighted);
         // Tree from the selected package down to what it needs.
         let tree: Vec<String> = g
-            .forest(true)
+            .forest(true, false)
             .iter()
             .map(|l| format!("{}{}", l.prefix, g.node(&l.id).unwrap().label))
             .collect();
