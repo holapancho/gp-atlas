@@ -38,15 +38,18 @@ never reachable from the read-only runner, with the confirmations in §6.
 
 `sf package version create` (blocklisted today: final segment `create`).
 
-- **Promotable** (can be released later with `promote`): validation runs and
-  code coverage is computed, e.g. `--code-coverage` (managed packages need
-  ≥ 75% to promote). Optional `--async-validation` returns earlier and
+- **Promotable** (can be released later with `promote`): validation runs, and
+  `--code-coverage` computes and stores coverage by running the packaged
+  Apex tests (promotion needs enough coverage; check the current threshold). Optional `--async-validation` returns earlier and
   validates in the background.
 - **Not promotable** (fast builds for testing): `--skip-validation`. Such a
-  version can never be promoted. The template must say so in the preview.
-- Useful extras for the form: `--installation-key` / `--installation-key-bypass`
-  (one of them is required), `--branch`, `--tag`, `--version-number`,
-  `--wait`, and reminding the user about `calculateTransitiveDependencies`
+  version can never be promoted ("you can't promote unvalidated package
+  versions", CLI message). The template must say so in the preview.
+- Useful extras for the form (verified in 3.0.6 `version/create.ts`):
+  `--installation-key` / `--installation-key-bypass` (one of them is
+  required), `--version-number`, `--version-name`, `--version-description`,
+  `--skip-ancestor-check`, `--definition-file`; `--branch`, `--tag`,
+  `--wait` to be confirmed from the manifest, and reminding the user about `calculateTransitiveDependencies`
   in `sfdx-project.json` (so `d` shows the full graph later, SPEC F42/F43).
 - Read-only follow-up already in GP Atlas: `package version create list` /
   `report` (build status).
@@ -65,9 +68,11 @@ Warnings to show before the command is even copyable:
 
 1. What will be deleted: package name, version number, 04t/0Ho, released or
    not, how many versions (for a package).
-2. Released versions of managed packages cannot be deleted; installed
-   versions break subscribers' upgrade paths. (Verify the exact CLI rules
-   before building.)
+2. The CLI's own rule (plugin-packaging 3.0.6 `package_version_delete.md`):
+   "In second-generation managed packaging, only beta package versions can
+   be deleted"; it links Salesforce's package-deletion considerations, which
+   the warning should link too. `package version delete --undelete` restores
+   a deleted version: mention it.
 3. Typed confirmation: the user types the version number (or package name)
    to unlock **Copy**; never a single keypress.
 4. One item at a time: no "delete all", no multi-select delete.
@@ -150,7 +155,7 @@ plus fixtures.
 | ID | Unknown |
 |---|---|
 | W1 | `push-upgrade list` / `report` JSON shapes (real capture on a package with push history) |
-| W2 | Exact delete rules for released/installed versions (CLI messages) |
+| W2 | Delete rules beyond "only beta versions in 2GP managed" (unlocked packages, whole packages): read the deletion-considerations page |
 | W3 | The owner's 1GP Apex page: object/field names and the start step |
 | W4 | Whether `push-upgrade` is in `sf commands --json` of 2.150.6 with these flags (manifest/contract) |
 
