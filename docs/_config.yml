@@ -1,0 +1,28 @@
+# GitHub Pages site (built by .github/workflows/pages.yml from this folder).
+title: GP Atlas
+url: https://holapancho.github.io
+baseurl: /gp-atlas
+description: Browse 1GP and 2GP package versions and build sf commands, from a clickable terminal app. Read-only.
+remote_theme: just-the-docs/just-the-docs@v0.10.0
+plugins:
+  - jekyll-remote-theme
+  - jekyll-relative-links
+relative_links:
+  enabled: true
+  collections: false
+aux_links:
+  "GitHub": "https://github.com/holapancho/gp-atlas"
+aux_links_new_tab: true
+search_enabled: true
+heading_anchors: true
+footer_content: "Not affiliated with or endorsed by Salesforce. MIT license."
+# Internal design notes are kept in the repository, not published.
+exclude:
+  - ideas/
+# Every page uses the theme's layout (explicit, so it does not depend on the
+# jekyll-default-layout plugin).
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default

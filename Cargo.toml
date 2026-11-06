@@ -30,3 +30,6 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 dbg_macro = "deny"
 todo = "deny"
+
+[profile.release]
+strip = true

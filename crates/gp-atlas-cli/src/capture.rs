@@ -1,5 +1,5 @@
 //! `capture`: runs the read-only command set against the user's orgs and saves
-//! sanitized output (fixtures for SPEC §4.7 / docs/FIXTURE_CAPTURE.md).
+//! sanitized output (fixtures for SPEC §4.7 / docs/fixture-capture.md).
 
 use std::fmt::Write as _;
 use std::path::Path;
