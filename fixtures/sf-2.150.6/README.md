@@ -37,4 +37,4 @@ Sanitization:
   `--target-org`), the only form GP Atlas emits. The output does not depend
   on the spelling.
 
-The remaining real-org captures are listed in `docs/FIXTURE_CAPTURE.md`.
+The remaining real-org captures are listed in `docs/fixture-capture.md`.

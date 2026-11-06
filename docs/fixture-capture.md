@@ -1,9 +1,14 @@
-# GP Atlas — Fixture capture checklist
+---
+title: Fixture capture
+nav_order: 5
+---
+
+# Fixture capture checklist
 
 The `sf` outputs that **cannot** be learned from the CLI source, schemas or plugin tests
 and must come from real orgs (SPEC §4.7: U5, U7, U8, and the ancestry/dependency
-unknowns U10–U14 in `docs/ideas/ANCESTRY_AND_DEPENDENCIES.md`). Everything else
-was resolved from the installed `sf` 2.150.6 and its plugins — see SPEC §4.3 F24–F43.
+unknowns U10–U14). Everything else
+was resolved from the installed `sf` 2.150.6 and its plugins — see [SPEC §4.3](https://github.com/holapancho/gp-atlas/blob/main/SPEC.md) F24–F43.
 
 Captures can also be pasted as anonymized Markdown (command, JSON, notes), as
 was done for ancestry, dependencies and 1GP.

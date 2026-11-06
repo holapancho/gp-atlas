@@ -1,0 +1,109 @@
+name: Release
+
+# Builds gp-atlas and gp-atlas-beta for each supported system when a version
+# tag (v*) is pushed, and publishes them with SHA256SUMS on a GitHub Release.
+# Asset names carry no version, so the install scripts can always fetch
+# releases/latest/download/<asset>.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-version:
+    name: Tag matches Cargo.toml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare tag and workspace version
+        shell: bash
+        run: |
+          version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match Cargo.toml version $version"
+            exit 1
+          fi
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: check-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain and target
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Build
+        run: cargo build --locked --release --target ${{ matrix.target }} -p gp-atlas-tui -p gp-atlas-cli
+      - name: Package
+        shell: bash
+        run: |
+          name="gp-atlas-${{ matrix.target }}"
+          ext=""
+          if [ "$RUNNER_OS" = "Windows" ]; then ext=".exe"; fi
+          mkdir "$name"
+          cp "target/${{ matrix.target }}/release/gp-atlas$ext" "target/${{ matrix.target }}/release/gp-atlas-beta$ext" "$name/"
+          cp README.md LICENSE CHANGELOG.md "$name/"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a "$name.zip" "$name" > /dev/null
+          else
+            tar -czf "$name.tar.gz" "$name"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-atlas-${{ matrix.target }}
+          path: |
+            gp-atlas-${{ matrix.target }}.tar.gz
+            gp-atlas-${{ matrix.target }}.zip
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum gp-atlas-* > SHA256SUMS
+          cat SHA256SUMS
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "GP Atlas $GITHUB_REF_NAME" \
+            --notes "See CHANGELOG.md for what changed. Install: https://holapancho.github.io/gp-atlas/install.html" \
+            $prerelease

@@ -43,7 +43,7 @@ jobs:
         run: |
           mkdir dist
           cp "target/release/gp-atlas${{ matrix.ext }}" "target/release/gp-atlas-beta${{ matrix.ext }}" dist/
-          cp docs/BETA.md LICENSE dist/
+          cp docs/beta-testing.md docs/install.md docs/guide.md LICENSE dist/
           # Zip keeps the executable bit (upload-artifact alone does not).
           cd dist
           if [ "$RUNNER_OS" = "Windows" ]; then
