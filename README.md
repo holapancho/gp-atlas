@@ -9,6 +9,8 @@ how versions are related, and builds exact `sf` commands for you to copy. It
 uses your installed `sf` as its only data source and is **read-only**: it
 never changes an org.
 
+![GP Atlas: packages on the left, versions with project aliases on the right](docs/assets/images/packages.png)
+
 > **Not affiliated with or endorsed by Salesforce.** Salesforce and related
 > marks are trademarks of Salesforce, Inc.
 
