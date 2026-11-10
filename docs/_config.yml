@@ -1,4 +1,5 @@
-# GitHub Pages site (built by .github/workflows/pages.yml from this folder).
+# GitHub Pages site, published from this folder (Settings -> Pages:
+# Deploy from a branch, main, /docs).
 title: GP Atlas
 url: https://holapancho.github.io
 baseurl: /gp-atlas

@@ -471,7 +471,7 @@ dependencies = [
 
 [[package]]
 name = "extract-manifest"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "gp-atlas-core",
  "serde_json",
@@ -480,7 +480,7 @@ dependencies = [
 
 [[package]]
 name = "fake-sf"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "gp-atlas-core",
  "serde",
@@ -601,7 +601,7 @@ dependencies = [
 
 [[package]]
 name = "gp-atlas-cli"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "clap",
  "gp-atlas-core",
@@ -611,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "gp-atlas-contract-tests"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "gp-atlas-core",
  "serde_json",
@@ -620,7 +620,7 @@ dependencies = [
 
 [[package]]
 name = "gp-atlas-core"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -630,7 +630,7 @@ dependencies = [
 
 [[package]]
 name = "gp-atlas-tui"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "arboard",
  "clap",
