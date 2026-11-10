@@ -89,7 +89,6 @@ It needs `node` with Playwright and Chromium. The demo data is in
 | `ci.yml` | every push and PR | fmt, clippy, tests on Linux, macOS, Windows; `sf-contract` (2.150.6); `sf-latest` (non-blocking); `cargo deny`; `cargo audit` |
 | `beta.yml` | push to `main` | Pre-release binaries as workflow artifacts |
 | `release.yml` | tag `v*` | Release binaries, `SHA256SUMS`, GitHub Release |
-| `pages.yml` | push to `main` touching `docs/` | This site |
 
 ## Releasing
 
@@ -110,6 +109,9 @@ install scripts always fetch the latest release.
 
 ## GitHub Pages
 
-One-time setup in the repository: **Settings → Pages → Build and deployment →
-Source: GitHub Actions**. After that, `pages.yml` publishes `docs/` on every
-push to `main` that changes it, at <https://holapancho.github.io/gp-atlas/>.
+The site is published by GitHub Pages itself (**Settings → Pages → Deploy
+from a branch: `main`, `/docs`**): every push to `main` that changes `docs/`
+rebuilds <https://holapancho.github.io/gp-atlas/> within a couple of minutes
+(the "pages build and deployment" run in Actions). The theme is Just the Docs
+(`remote_theme` in `docs/_config.yml`); custom styles are in
+`docs/_sass/custom/custom.scss`.

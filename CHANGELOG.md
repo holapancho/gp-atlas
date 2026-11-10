@@ -6,6 +6,8 @@ All notable changes. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-10
+
 First public version. Requires the Salesforce CLI 2.150.6 or newer.
 
 ### Added
@@ -35,4 +37,5 @@ First public version. Requires the Salesforce CLI 2.150.6 or newer.
 - Install scripts for macOS, Linux and Windows; release builds with
   checksums; documentation site.
 
-[Unreleased]: https://github.com/holapancho/gp-atlas/commits/main
+[Unreleased]: https://github.com/holapancho/gp-atlas/compare/v0.1.0...main
+[0.1.0]: https://github.com/holapancho/gp-atlas/releases/tag/v0.1.0
