@@ -95,7 +95,10 @@ It needs `node` with Playwright and Chromium. The demo data is in
 1. Set `version` in the root `Cargo.toml` (`[workspace.package]`) and run
    `cargo build` so `Cargo.lock` follows.
 2. Move the "Unreleased" notes in `CHANGELOG.md` under the new version.
-3. Commit, then tag and push the tag:
+3. Commit and merge to `main`, then start the release in either way:
+   - **Actions → Release → Run workflow** on `main`, tag `v0.1.0`: the
+     workflow creates the tag on that commit;
+   - or tag and push the tag yourself:
 
 ```bash
 git tag v0.1.0
