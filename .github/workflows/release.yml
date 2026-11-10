@@ -8,12 +8,20 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Or from Actions -> Release -> Run workflow: builds the selected branch's
+  # head and creates the tag together with the release.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to create, e.g. v0.1.0 (must match Cargo.toml)"
+        required: true
 
 permissions:
   contents: read
 
 env:
   CARGO_TERM_COLOR: always
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   check-version:
@@ -25,8 +33,8 @@ jobs:
         shell: bash
         run: |
           version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)"
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match Cargo.toml version $version"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::tag $TAG does not match Cargo.toml version $version"
             exit 1
           fi
 
@@ -102,8 +110,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           prerelease=""
-          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --title "GP Atlas $GITHUB_REF_NAME" \
+          case "$TAG" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$TAG" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "GP Atlas $TAG" \
             --notes "See CHANGELOG.md for what changed. Install: https://holapancho.github.io/gp-atlas/install.html" \
             $prerelease
