@@ -62,6 +62,14 @@ V["bill"] = [("1.0.0.2", True, None, "", "2025-07-01"), ("2.0.0.1", True, "1.0.0
              ("2.1.0.3", True, "2.0.0.1", "", "2026-09-30"), ("2.2.0.1", False, "2.1.0.3", "feature/tax", "2026-11-05")]
 V["conn"] = [("1.0.0.1", True, None, "", "2025-11-18"), ("1.2.0.1", True, "1.0.0.1", "", "2026-06-14")]
 V["anal"] = [("0.9.0.5", False, None, "", "2026-10-21"), ("1.0.0.2", True, None, "", "2026-10-29")]
+D = {("core", "1.0.0.1"): "First release", ("core", "1.1.0.2"): "Account sync",
+     ("core", "1.1.1.1"): "Fix sync retries", ("core", "2.0.0.3"): "New data model",
+     ("core", "2.1.0.2"): "Bulk import", ("core", "2.2.0.1"): "Faster search",
+     ("core", "2.3.0.4"): "Audit trail\nand export to CSV", ("core", "2.4.0.1"): "Multi-currency (beta)",
+     ("bill", "1.0.0.2"): "Invoices", ("bill", "2.0.0.1"): "Payment plans",
+     ("bill", "2.1.0.3"): "Fixes invoice rounding", ("bill", "2.2.0.1"): "Tax engine",
+     ("conn", "1.0.0.1"): "REST connector", ("conn", "1.2.0.1"): "Webhooks",
+     ("anal", "1.0.0.2"): "Dashboards"}
 ids = {}
 n = 0
 allrows = []
@@ -76,7 +84,7 @@ for k, vs in V.items():
         r = {"Package2Id": pid(k), "Branch": br or None, "Tag": None, "MajorVersion": ma, "MinorVersion": mi,
              "PatchVersion": pa, "BuildNumber": bu, "Id": "05i" + ids[(k, ver)][3:],
              "SubscriberPackageVersionId": ids[(k, ver)], "ConvertedFromVersionId": None,
-             "Name": f"v{ma}.{mi}", "NamespacePrefix": P[k][3], "Package2Name": P[k][1], "Description": "",
+             "Name": f"v{ma}.{mi}", "NamespacePrefix": P[k][3], "Package2Name": P[k][1], "Description": D.get((k, ver)),
              "Version": ver, "IsPasswordProtected": False, "IsReleased": rel,
              "CreatedDate": cd + " 14:02", "LastModifiedDate": cd + " 14:40",
              "InstallUrl": "https://login.salesforce.com/packaging/installPackage.apexp?p0=" + ids[(k, ver)],

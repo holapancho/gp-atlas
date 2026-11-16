@@ -602,7 +602,14 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<
         ),
         Tab::Versions => {
             let mut h = vec![
-                "Package", "Version", "04t", "Released", "Branch", "Ancestor", "Created",
+                "Package",
+                "Version",
+                "04t",
+                "Released",
+                "Branch",
+                "Ancestor",
+                "Created",
+                "Description",
             ];
             let mut w = vec![
                 Constraint::Fill(2),
@@ -612,6 +619,7 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<
                 Constraint::Length(12),
                 Constraint::Length(10),
                 Constraint::Length(16),
+                Constraint::Fill(3),
             ];
             let mut k = vec![
                 "Package2Name",
@@ -621,6 +629,7 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<
                 "Branch",
                 "AncestorVersion",
                 "CreatedDate",
+                "Description",
             ];
             if app.project.project().is_some() {
                 // Min outranks Length: the fixed columns give way first.
@@ -635,6 +644,7 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<
                 w.push(Constraint::Length(9));
                 k.push("CodeCoverage");
             }
+            make_room_for_description(area.width, &mut h, &mut w, &mut k);
             (h, w, k)
         }
         Tab::Installed => (
@@ -737,7 +747,10 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<
                     if *k == ALIAS_KEY {
                         return alias_tcell(project, &rows[i], "SubscriberPackageVersionId");
                     }
-                    let t = cell_text(&rows[i], k);
+                    let mut t = cell_text(&rows[i], k);
+                    if *k == "Description" {
+                        t = one_line(&t);
+                    }
                     let style = if *k == "IsReleased" && t == "true" {
                         Style::new().fg(Color::Green)
                     } else {
@@ -748,6 +761,51 @@ fn draw_panel(f: &mut Frame, app: &mut App, area: Rect, tab: Tab, focus: Option<
                 .collect()
         },
     );
+}
+
+/// Narrow version panes: hide Created, then Ancestor, then Branch (all three
+/// stay in the details) so the Description column keeps some room.
+fn make_room_for_description(
+    width: u16,
+    h: &mut Vec<&str>,
+    w: &mut Vec<Constraint>,
+    k: &mut Vec<&str>,
+) {
+    const DESC_MIN: u16 = 20;
+    // Borders, the "▶ " highlight symbol, one space between columns.
+    let avail = width.saturating_sub(4);
+    let needed = |w: &[Constraint], k: &[&str]| -> u16 {
+        let cells: u16 = w
+            .iter()
+            .zip(k)
+            .map(|(c, key)| match (c, *key) {
+                (_, "Description") => DESC_MIN,
+                (Constraint::Length(n) | Constraint::Min(n), _) => *n,
+                _ => 10,
+            })
+            .sum();
+        cells + (w.len() as u16).saturating_sub(1)
+    };
+    for drop in ["CreatedDate", "AncestorVersion", "Branch"] {
+        if needed(w, k) <= avail {
+            break;
+        }
+        if let Some(i) = k.iter().position(|x| *x == drop) {
+            h.remove(i);
+            w.remove(i);
+            k.remove(i);
+        }
+    }
+}
+
+/// First line of a multi-line cell, marked with `…` when there is more.
+fn one_line(t: &str) -> String {
+    let mut lines = t.lines().filter(|l| !l.trim().is_empty());
+    match (lines.next(), lines.next()) {
+        (Some(a), Some(_)) => format!("{} …", a.trim_end()),
+        (Some(a), None) => a.trim_end().to_owned(),
+        _ => String::new(),
+    }
 }
 
 /// Pseudo column key for the project alias column.
@@ -1384,6 +1442,109 @@ mod tests {
         for (w, h) in [(80, 24), (30, 8), (1, 1)] {
             let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
             term.draw(|f| draw(f, &mut app)).unwrap();
+        }
+    }
+
+    /// Issue #5: the version description shows in the table (first line) and
+    /// on top of the details, from the report or else from the list row.
+    #[test]
+    fn version_description_shows() {
+        use crate::worker::{Done, Job, Outcome};
+        use gp_atlas_core::ids::{Id04t, OrgRef};
+        let screen = |app: &mut App, w: u16, h: u16| {
+            let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
+            term.draw(|f| draw(f, app)).unwrap();
+            term.backend()
+                .buffer()
+                .content()
+                .iter()
+                .map(|c| c.symbol())
+                .collect::<String>()
+        };
+        let v1 = "04t000000000001AAA";
+        let mut app = app();
+        app.versions.load = Some(Load::Ready(ListData {
+            rows: vec![serde_json::json!({
+                "Package2Name": "fake0219", "Package2Id": "0Ho00000000000jCAA",
+                "Version": "1.0.0.1", "SubscriberPackageVersionId": v1,
+                "IsReleased": true, "Description": "Fixes invoice rounding\nand tax lines"
+            })],
+            warnings: vec![],
+        }));
+        app.tab = Tab::Packages;
+        for w in [220, 150, 120] {
+            let text = screen(&mut app, w, 20);
+            assert!(text.contains("Description"), "{w}: {text}");
+            assert!(text.contains("Fixes invoice"), "{w}: {text}");
+        }
+        let text = screen(&mut app, 220, 20);
+        assert!(text.contains("Fixes invoice rounding …"), "{text}");
+        assert!(text.contains("Created"), "{text}");
+
+        // Details: the report has no description; the list row's is used.
+        app.details_row = app.version_rows().first().map(|r| (*r).clone());
+        app.popup = Some(Popup {
+            title: "t".into(),
+            lines: vec![],
+            scroll: 0,
+            loading_id: Some(42),
+        });
+        let done = |value| Done {
+            id: 42,
+            job: Job::Report {
+                hub: OrgRef::new("hub").unwrap(),
+                version: Id04t::new(v1).unwrap(),
+            },
+            outcome: Outcome::Ok {
+                value,
+                warnings: vec![],
+            },
+            log: vec![],
+        };
+        app.on_done(done(serde_json::json!({
+            "SubscriberPackageVersionId": v1, "Version": "1.0.0.1", "Description": null
+        })));
+        let lines = app.popup.as_ref().unwrap().lines.clone();
+        assert!(
+            lines
+                .iter()
+                .any(|l| l == "Description  Fixes invoice rounding"),
+            "{lines:?}"
+        );
+        assert!(
+            lines.iter().any(|l| l.trim() == "and tax lines"),
+            "{lines:?}"
+        );
+        assert!(
+            lines.iter().any(|l| l == "Package      fake0219"),
+            "{lines:?}"
+        );
+
+        // The report's own description wins over the list row's.
+        app.popup.as_mut().unwrap().loading_id = Some(42);
+        app.on_done(done(serde_json::json!({
+            "SubscriberPackageVersionId": v1, "Description": "From the report"
+        })));
+        let lines = &app.popup.as_ref().unwrap().lines;
+        assert!(
+            lines.iter().any(|l| l == "Description  From the report"),
+            "{lines:?}"
+        );
+
+        // No description anywhere: said so, not "null".
+        app.details_row = None;
+        app.popup.as_mut().unwrap().loading_id = Some(42);
+        app.on_done(done(
+            serde_json::json!({"SubscriberPackageVersionId": v1, "Description": null}),
+        ));
+        let lines = &app.popup.as_ref().unwrap().lines;
+        assert!(
+            lines.iter().any(|l| l == "Description  (none)"),
+            "{lines:?}"
+        );
+        assert!(!lines.iter().any(|l| l.contains("null")), "{lines:?}");
+        for (w, h) in [(80, 24), (30, 8), (1, 1)] {
+            screen(&mut app, w, h);
         }
     }
 

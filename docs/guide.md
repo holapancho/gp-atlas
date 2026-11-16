@@ -73,6 +73,12 @@ retried. `--no-cache` turns the cache off.
 
 Packages on the left, the selected package's versions on the right
 (`‹ All packages ›` shows every version). `←` `→` or a click switch pane.
+The Description column shows each version's description (the first line,
+`…` when there is more); `Enter` shows it in full at the top of the details,
+with the package, version, 04t, branch, tag and ancestor, then the full
+`package version report --verbose`. When the pane is narrow, Created, then
+Ancestor, then Branch are hidden from the table to leave room for the
+description; widen the terminal to see them, or open the details.
 
 | Key | Action |
 |---|---|

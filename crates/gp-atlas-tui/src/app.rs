@@ -338,6 +338,9 @@ pub struct App {
     pub log: Vec<LogEntry>,
     pub log_scroll: Scroll,
     pub popup: Option<Popup>,
+    /// Version-list row behind the open version details popup: the report
+    /// replaces the popup's lines, and this fills what the report lacks.
+    pub details_row: Option<Value>,
     pub graph: Option<GraphView>,
     pub status: String,
     pub hits: Hits,
@@ -388,6 +391,7 @@ impl App {
             log: Vec::new(),
             log_scroll: Scroll::default(),
             popup: None,
+            details_row: None,
             graph: None,
             status: "Checking the Salesforce CLI…".into(),
             hits: Hits::default(),
@@ -529,7 +533,17 @@ impl App {
                 {
                     p.loading_id = None;
                     p.lines = match o {
-                        Outcome::Ok { value, .. } => kv_lines(&value),
+                        Outcome::Ok { value, .. } => {
+                            let row = self.details_row.as_ref().filter(|r| {
+                                str_of(r, "SubscriberPackageVersionId").as_deref()
+                                    == Some(version.as_str())
+                            });
+                            let mut l = version_summary(Some(&value), row);
+                            l.push(String::new());
+                            l.push("── package version report --verbose ──".into());
+                            l.extend(kv_lines(&value));
+                            l
+                        }
                         Outcome::Failed(f) => failure_lines(&f, ""),
                         _ => vec!["Cancelled.".into()],
                     };
@@ -1477,7 +1491,12 @@ impl App {
         else {
             return;
         };
-        self.open_version_details(v, kv_lines(&row));
+        let mut lines = version_summary(None, Some(&row));
+        lines.push(String::new());
+        lines.push("── version list row ──".into());
+        lines.extend(kv_lines(&row));
+        self.details_row = Some(row);
+        self.open_version_details(v, lines);
     }
 
     /// Popup with `package version report --verbose` for a version.
@@ -1908,7 +1927,23 @@ impl App {
         let Some(v) = self.graph_selected_id().and_then(|s| Id04t::new(&s).ok()) else {
             return;
         };
+        self.details_row = self.versions_by_id(v.as_str()).or_else(|| {
+            self.details_row
+                .take()
+                .filter(|r| str_of(r, "SubscriberPackageVersionId").as_deref() == Some(v.as_str()))
+        });
         self.open_version_details(v, vec![]);
+    }
+
+    /// A loaded version-list row by its 04t (all rows, not only the shown ones).
+    fn versions_by_id(&self, id: &str) -> Option<Value> {
+        let Load::Ready(d) = self.versions.load() else {
+            return None;
+        };
+        d.rows
+            .iter()
+            .find(|r| str_of(r, "SubscriberPackageVersionId").as_deref() == Some(id))
+            .cloned()
     }
 
     /// Install state of a dependency in the selected org, as short text.
@@ -2390,12 +2425,62 @@ pub fn kv_lines(v: &Value) -> Vec<String> {
                         Value::Object(_) | Value::Array(_) => val.to_string(),
                         _ => cell_text(obj, k),
                     };
-                    format!("{k:<w$}  {s}")
+                    labelled(k, w, &s)
                 })
-                .collect()
+                .collect::<Vec<_>>()
+                .concat()
         }
         None => v.to_string().lines().map(str::to_owned).collect(),
     }
+}
+
+/// `label  value`, with the lines of a multi-line value aligned under the first.
+fn labelled(label: &str, w: usize, value: &str) -> Vec<String> {
+    let mut parts = value.lines();
+    let first = parts.next().unwrap_or("");
+    let mut out = vec![format!("{label:<w$}  {first}").trim_end().to_owned()];
+    out.extend(parts.map(|l| format!("{:w$}  {l}", "").trim_end().to_owned()));
+    out
+}
+
+/// The fields people look for first in a 2GP version, the description among
+/// them: from `package version report` when it has a value, else from the
+/// version-list row (issue #5).
+pub fn version_summary(report: Option<&Value>, row: Option<&Value>) -> Vec<String> {
+    let first = |v: &'_ Value| {
+        v.as_array()
+            .and_then(|a| a.first())
+            .cloned()
+            .unwrap_or_else(|| v.clone())
+    };
+    let sources: Vec<Value> = [report, row].into_iter().flatten().map(first).collect();
+    let pick = |key: &str| {
+        sources
+            .iter()
+            .map(|v| cell_text(v, key))
+            .find(|t| !t.trim().is_empty())
+    };
+    let fields = [
+        ("Package", "Package2Name"),
+        ("Version", "Version"),
+        ("04t", "SubscriberPackageVersionId"),
+        ("Description", "Description"),
+        ("Released", "IsReleased"),
+        ("Branch", "Branch"),
+        ("Tag", "Tag"),
+        ("Ancestor", "AncestorVersion"),
+        ("Created", "CreatedDate"),
+    ];
+    let w = fields.iter().map(|f| f.0.len()).max().unwrap_or(0);
+    fields
+        .iter()
+        .filter_map(|(label, key)| match pick(key) {
+            Some(v) => Some(labelled(label, w, &v)),
+            None if *key == "Description" => Some(labelled(label, w, "(none)")),
+            None => None,
+        })
+        .collect::<Vec<_>>()
+        .concat()
 }
 
 pub fn failure_lines(f: &Failure, org: &str) -> Vec<String> {

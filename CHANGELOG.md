@@ -6,6 +6,12 @@ All notable changes. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- 2GP versions: the version description is shown, as a Description column and
+  at the top of the version details (from the report, or the version list when
+  the report has none) ([#5](https://github.com/holapancho/gp-atlas/issues/5)).
+
 ## [0.1.0] - 2026-11-10
 
 First public version. Requires the Salesforce CLI 2.150.6 or newer.
