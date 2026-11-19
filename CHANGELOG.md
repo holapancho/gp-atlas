@@ -6,6 +6,8 @@ All notable changes. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-19
+
 ### Added
 
 - History: `c` (or right-click) copies a past call as a command to run
@@ -50,5 +52,6 @@ First public version. Requires the Salesforce CLI 2.150.6 or newer.
 - Install scripts for macOS, Linux and Windows; release builds with
   checksums; documentation site.
 
-[Unreleased]: https://github.com/holapancho/gp-atlas/compare/v0.1.0...main
+[Unreleased]: https://github.com/holapancho/gp-atlas/compare/v0.1.1...main
+[0.1.1]: https://github.com/holapancho/gp-atlas/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/holapancho/gp-atlas/releases/tag/v0.1.0
