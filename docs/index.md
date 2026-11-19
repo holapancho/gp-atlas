@@ -27,7 +27,7 @@ description: "GP Atlas: a clickable terminal app to browse 1GP and 2GP package v
 ## Why GP Atlas
 
 <div class="cards">
-  <div class="card"><div class="icon">🧭</div><h3>See the whole picture</h3><p>Packages, versions, released or not, latest per package, install links and full version details, without memorizing flags.</p></div>
+  <div class="card"><div class="icon">🧭</div><h3>See the whole picture</h3><p>Packages, versions with their descriptions, released or not, latest per package, install links and full version details, without memorizing flags.</p></div>
   <div class="card"><div class="icon">🌳</div><h3>Ancestry at a glance</h3><p>A package's version tree, with the path from any version back to its root and what was built on it.</p></div>
   <div class="card"><div class="icon">🔗</div><h3>Dependencies in install order</h3><p>What to install first, and whether each dependency is already in the target org, older or missing.</p></div>
   <div class="card"><div class="icon">🛂</div><h3>Know what each org allows</h3><p>The Access Matrix probes every org and explains every "no": not a Dev Hub, expired session, deleted org, with a fix to copy.</p></div>
@@ -80,7 +80,7 @@ description: "GP Atlas: a clickable terminal app to browse 1GP and 2GP package v
 - **Doctor**: checks `sf`, its version, the packaging plugin, and every command's flags; on a newer CLI only a changed command is disabled.
 - **Project aliases** from `sfdx-project.json` (read-only): an Alias column, orphan / duplicate / missing warnings, ready-to-paste entries.
 - **Installed packages** and **1GP versions**, with released and latest-per-package filters for long lists.
-- **History** of every `sf` call with exit code and stderr; `c` or a right-click copies any ID, even over SSH.
+- **History** of every `sf` call with exit code and stderr: copy it as a command ready to run (quoted, no `--json`), exactly as run, or with all its details. `c` or a right-click copies any ID, even over SSH.
 
 <div class="promise" markdown="1">
 

@@ -47,12 +47,12 @@ Then run `gp-atlas`. Other ways (manual download, clone and build) are in
 
 - **Doctor**: checks `sf`, its version, the packaging plugin and every command's flags.
 - **Orgs** and the **Access Matrix**: what each org lets you read, why not, and a fix to copy.
-- **2GP packages & versions**: released / latest per package, details, copy 04t or install link.
+- **2GP packages & versions**: released / latest per package, version descriptions, details, copy 04t or install link.
 - **Ancestry** tree and **dependencies** in install order, checked against the selected org.
 - **Installed packages** and **1GP versions**, with filters for long lists.
 - **Project aliases** from `sfdx-project.json` (read-only), with warnings and ready-to-paste entries.
 - **Command Builder**: every read-only command as a validated form, quoted for bash/zsh, PowerShell or cmd; copy or run.
-- **History** of every `sf` call; `c` or right-click copies any ID.
+- **History** of every `sf` call: copy it as a command ready to run (quoted, no `--json`), exactly as run, or with its exit code and stderr; `c` or right-click copies any ID.
 
 Keys and screens: [User guide](docs/guide.md).
 
