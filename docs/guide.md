@@ -26,7 +26,7 @@ open it), scroll with the wheel, or use the keyboard. `?` shows every key,
 | `↑` `↓` `j` `k` `PgUp` `PgDn` `g` `G` | Move |
 | `Enter` | Open or select |
 | `r` | Refresh the tab |
-| `c` or **right-click** | Copy the selected row's ID (username on Orgs and Access, the command on History) |
+| `c` or **right-click** | Copy the selected row's ID (username on Orgs and Access, the command ready to run on History) |
 | `P` | Project aliases and their warnings |
 | `?` | Help |
 | `Esc` | Cancel / close |
@@ -125,7 +125,16 @@ long, so:
 ## 7 · History
 
 Every `sf` call GP Atlas made: command, exit code, duration and stderr. `Enter`
-shows the details, `c` copies the command.
+shows the details.
+
+| Key | Action |
+|---|---|
+| `c` or **right-click** | Copy the command to run it yourself: without `--json`, quoted for the shell chosen in the Command Builder (bash/zsh by default) |
+| `C` | Copy the call exactly as GP Atlas ran it, with `--json` |
+
+The details screen ("sf call") shows both forms of the command, then the exit
+code, duration, result and stderr. There, `c` copies the command to run, `C`
+the call as run, and `a` everything on the screen.
 
 ## 8 · Command Builder
 

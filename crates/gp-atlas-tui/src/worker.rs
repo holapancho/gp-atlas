@@ -165,7 +165,10 @@ impl Failure {
 #[derive(Debug, Clone)]
 pub struct LogEntry {
     pub at: SystemTime,
+    /// Exactly as run: `sf` and its argv joined by spaces (with `--json`).
     pub command: String,
+    /// The argv itself, to rebuild a quoted command (History `c`).
+    pub argv: Vec<String>,
     pub exit: Option<i32>,
     pub duration: Duration,
     pub state: String,
@@ -254,6 +257,7 @@ fn log_entry(out: &RunOutput, c: &Classified) -> LogEntry {
     LogEntry {
         at: SystemTime::now(),
         command: format!("sf {}", out.argv.join(" ")),
+        argv: out.argv.clone(),
         exit: out.exit_code,
         duration: out.duration,
         state: c.state.short(),

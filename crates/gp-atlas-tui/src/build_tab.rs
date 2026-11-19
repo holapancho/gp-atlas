@@ -359,6 +359,7 @@ impl App {
                     ],
                     scroll: 0,
                     loading_id: Some(id),
+                    copies: None,
                 });
             }
             Err(f) => {
@@ -367,6 +368,7 @@ impl App {
                     lines: failure_lines(&f, ""),
                     scroll: 0,
                     loading_id: None,
+                    copies: None,
                 });
             }
         }

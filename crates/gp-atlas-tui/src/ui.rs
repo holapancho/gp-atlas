@@ -182,7 +182,7 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
             Tab::Pkg1 => {
                 "R released · L latest per package · f only this package · x clear · c copy 04t · Enter details · r refresh"
             }
-            Tab::Log => "Enter details · c copy command",
+            Tab::Log => "Enter details · c copy command · C copy as run (--json)",
             Tab::Builder if app.builder.editing.is_some() => {
                 "typing… Enter accept · Esc cancel · Backspace delete · Ctrl-U clear"
             }
@@ -1259,6 +1259,11 @@ fn draw_popup(f: &mut Frame, app: &mut App) {
         title.push_str(&format!("{} ", spinner()));
     }
     let lines: Vec<Line> = p.lines.iter().map(|l| Line::from(l.clone())).collect();
+    let hint = if p.copies.is_some() {
+        " Esc close · ↑↓ scroll · c copy command · C as run (--json) · a copy all "
+    } else {
+        " Esc close · ↑↓ scroll · c copy "
+    };
     f.render_widget(Clear, rect);
     f.render_widget(
         Paragraph::new(lines)
@@ -1266,7 +1271,7 @@ fn draw_popup(f: &mut Frame, app: &mut App) {
                 Block::new()
                     .borders(Borders::ALL)
                     .title(title)
-                    .title_bottom(Line::from(" Esc close · ↑↓ scroll · c copy ").right_aligned())
+                    .title_bottom(Line::from(hint).right_aligned())
                     .style(Style::new().bg(Color::Black)),
             )
             .wrap(Wrap { trim: false })
@@ -1352,6 +1357,7 @@ mod tests {
                         lines: vec!["x".repeat(300); 80],
                         scroll: 0,
                         loading_id: None,
+                        copies: None,
                     });
                     term.draw(|f| draw(f, &mut app)).unwrap();
                 }
@@ -1488,6 +1494,7 @@ mod tests {
             lines: vec![],
             scroll: 0,
             loading_id: Some(42),
+            copies: None,
         });
         let done = |value| Done {
             id: 42,
@@ -1546,6 +1553,86 @@ mod tests {
         for (w, h) in [(80, 24), (30, 8), (1, 1)] {
             screen(&mut app, w, h);
         }
+    }
+
+    /// History: the "sf call" screen copies the command to run, the call as
+    /// run, or everything.
+    #[test]
+    fn history_copies_command_or_everything() {
+        use crate::worker::LogEntry;
+        use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        let key = |app: &mut App, c: char| {
+            app.on_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+        };
+        let mut app = app();
+        app.log.clear();
+        let argv: Vec<String> = [
+            "package",
+            "version",
+            "list",
+            "--target-dev-hub",
+            "my-hub",
+            "--order-by",
+            "CreatedDate DESC",
+            "--json",
+        ]
+        .map(String::from)
+        .to_vec();
+        app.log.push(LogEntry {
+            at: std::time::SystemTime::UNIX_EPOCH,
+            command: format!("sf {}", argv.join(" ")),
+            argv,
+            exit: Some(1),
+            duration: std::time::Duration::from_millis(1500),
+            state: "Denied".into(),
+            rule: "R1",
+            stderr: "boom".into(),
+        });
+        let run = "sf package version list --target-dev-hub my-hub --order-by 'CreatedDate DESC'";
+        let raw =
+            "sf package version list --target-dev-hub my-hub --order-by CreatedDate DESC --json";
+        app.tab = Tab::Log;
+        key(&mut app, 'c');
+        assert!(app.status.ends_with(run), "{}", app.status);
+        key(&mut app, 'C');
+        assert!(app.status.ends_with(raw), "{}", app.status);
+
+        app.on_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        let p = app.popup.as_ref().expect("sf call popup");
+        assert!(p.lines.iter().any(|l| l == run), "{:?}", p.lines);
+        assert!(p.lines.iter().any(|l| l == raw), "{:?}", p.lines);
+        key(&mut app, 'c');
+        assert!(app.status.ends_with(run), "{}", app.status);
+        key(&mut app, 'C');
+        assert!(app.status.ends_with(raw), "{}", app.status);
+        key(&mut app, 'a');
+        assert!(app.status.contains("details"), "{}", app.status);
+        assert!(app.status.contains("lines)"), "{}", app.status);
+        assert!(app.popup.is_some());
+        let mut term = Terminal::new(TestBackend::new(120, 30)).unwrap();
+        term.draw(|f| draw(f, &mut app)).unwrap();
+        let text: String = term
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol())
+            .collect();
+        assert!(text.contains("a copy all"), "{text}");
+
+        // Other popups keep `c` = copy everything.
+        app.popup = None;
+        assert_eq!(
+            crate::app::runnable_command(
+                &["--version".into(), "--json".into()],
+                Default::default()
+            ),
+            Some("sf --version".into())
+        );
+        assert_eq!(
+            crate::app::runnable_command(&["a\nb".into()], Default::default()),
+            None
+        );
     }
 
     /// F42 fallback: direct dependencies from the version report, in

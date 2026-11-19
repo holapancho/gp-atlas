@@ -6,6 +6,13 @@ All notable changes. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- History: `c` (or right-click) copies a past call as a command to run
+  yourself, without `--json` and quoted for the Command Builder's shell; `C`
+  copies it exactly as GP Atlas ran it. On the details screen ("sf call"),
+  `c` copies the command, `C` the call as run and `a` all the information.
+
 ### Fixed
 
 - 2GP versions: the version description is shown, as a Description column and

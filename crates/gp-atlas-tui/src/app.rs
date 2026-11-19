@@ -14,6 +14,7 @@ use gp_atlas_core::manifest::Manifest;
 use gp_atlas_core::orgs::{self, Org};
 use gp_atlas_core::probe_cache::{self, CachedProbe};
 use gp_atlas_core::probes::{Capability, org_ref};
+use gp_atlas_core::quote::Shell;
 use gp_atlas_core::versions;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -280,6 +281,9 @@ pub struct Popup {
     pub lines: Vec<String>,
     pub scroll: u16,
     pub loading_id: Option<u64>,
+    /// The History "sf call" popup: what `c` and `C` copy there (the command
+    /// to run yourself, the call as run); `a` copies every line.
+    pub copies: Option<(Option<String>, String)>,
 }
 
 /// Screen regions recorded while rendering, for mouse hit-testing.
@@ -1203,7 +1207,18 @@ impl App {
                 KeyCode::Up | KeyCode::Char('k') => p.scroll = p.scroll.saturating_sub(1),
                 KeyCode::PageDown => p.scroll = p.scroll.saturating_add(10),
                 KeyCode::PageUp => p.scroll = p.scroll.saturating_sub(10),
-                KeyCode::Char('c') => {
+                KeyCode::Char('c') if p.copies.is_some() => {
+                    let (run, raw) = p.copies.clone().unwrap_or_default();
+                    match run {
+                        Some(cmd) => self.copy(&cmd, "command"),
+                        None => self.copy(&raw, "sf call as run"),
+                    }
+                }
+                KeyCode::Char('C') if p.copies.is_some() => {
+                    let raw = p.copies.as_ref().map(|c| c.1.clone()).unwrap_or_default();
+                    self.copy(&raw, "sf call as run (with --json)");
+                }
+                KeyCode::Char('c' | 'a') => {
                     let text = p.lines.join("\n");
                     self.copy(&text, "details");
                 }
@@ -1294,6 +1309,12 @@ impl App {
             (Tab::Packages | Tab::Versions, 's') => self.copy_alias_snippet(false),
             (Tab::Packages | Tab::Versions, 'S') => self.copy_alias_snippet(true),
             (_, 'c') => self.copy_id(),
+            (Tab::Log, 'C') => {
+                if let Some(e) = self.log.iter().rev().nth(self.log_scroll.selected) {
+                    let cmd = e.command.clone();
+                    self.copy(&cmd, "sf call as run (with --json)");
+                }
+            }
             (Tab::Orgs, 'h') => self.pick_org(true),
             (Tab::Orgs, 'o') => self.pick_org(false),
             (Tab::Access, 'p') => {
@@ -1384,14 +1405,27 @@ impl App {
                         lines: kv_lines(&row),
                         scroll: 0,
                         loading_id: None,
+                        copies: None,
                     });
                 }
             }
             Tab::Log => {
                 if let Some(e) = self.log.iter().rev().nth(self.log_scroll.selected) {
-                    let mut lines = vec![
+                    let shell = self.builder.opts.shell;
+                    let runnable = runnable_command(&e.argv, shell);
+                    let sf_call_copies = Some((runnable.clone(), e.command.clone()));
+                    let mut lines = vec![];
+                    if let Some(cmd) = runnable {
+                        lines.push("Run it yourself (c copies it):".into());
+                        lines.push(cmd);
+                        lines.push(String::new());
+                    }
+                    lines.extend([
+                        "As GP Atlas ran it (C copies it):".into(),
                         e.command.clone(),
                         String::new(),
+                    ]);
+                    lines.extend([
                         format!(
                             "exit code: {}",
                             e.exit.map_or("killed".into(), |c| c.to_string())
@@ -1399,7 +1433,7 @@ impl App {
                         format!("duration:  {:.1}s", e.duration.as_secs_f64()),
                         format!("result:    {}", e.state),
                         format!("rule:      {}", e.rule),
-                    ];
+                    ]);
                     if !e.stderr.is_empty() {
                         lines.push(String::new());
                         lines.push("stderr:".into());
@@ -1410,6 +1444,7 @@ impl App {
                         lines,
                         scroll: 0,
                         loading_id: None,
+                        copies: sf_call_copies,
                     });
                 }
             }
@@ -1480,6 +1515,7 @@ impl App {
             lines,
             scroll: 0,
             loading_id: None,
+            copies: None,
         });
     }
 
@@ -1520,6 +1556,7 @@ impl App {
             lines,
             scroll: 0,
             loading_id,
+            copies: None,
         });
     }
 
@@ -2000,8 +2037,14 @@ impl App {
             }
             Tab::Log => {
                 if let Some(e) = self.log.iter().rev().nth(self.log_scroll.selected) {
-                    let cmd = e.command.clone();
-                    self.copy(&cmd, "command");
+                    let shell = self.builder.opts.shell;
+                    match runnable_command(&e.argv, shell) {
+                        Some(cmd) => self.copy(&cmd, "command"),
+                        None => {
+                            let cmd = e.command.clone();
+                            self.copy(&cmd, "sf call as run");
+                        }
+                    }
                 }
             }
             Tab::Doctor => {}
@@ -2050,6 +2093,7 @@ impl App {
             lines,
             scroll: 0,
             loading_id: None,
+            copies: None,
         });
     }
 
@@ -2191,7 +2235,8 @@ impl App {
             "               Enter version details      Esc close",
             "Installed/1GP  c  copy 04t            Enter  details",
             "1GP            R released  L latest released per package  f only this package  x clear",
-            "History        c  copy command        Enter  details (exit code, stderr)",
+            "History        c  copy command to run   C  copy as run (--json)   Enter  details",
+            "               (in the details: c command · C as run · a everything: exit code, stderr…)",
             "Builder        ←/→ commands/form   ↑↓ field   Enter/Space edit, toggle or cycle",
             "               Del clear field   f fill from selection   x clear form",
             "               s shell (bash/zsh, PowerShell, cmd)   J --json   F short flags   M multi-line",
@@ -2204,6 +2249,7 @@ impl App {
             lines: lines.iter().map(|s| (*s).to_owned()).collect(),
             scroll: 0,
             loading_id: None,
+            copies: None,
         });
     }
 
@@ -2432,6 +2478,17 @@ pub fn kv_lines(v: &Value) -> Vec<String> {
         }
         None => v.to_string().lines().map(str::to_owned).collect(),
     }
+}
+
+/// A History entry as a command to paste in a terminal: `sf` and its argv
+/// without the `--json` GP Atlas adds, quoted for `shell` (the Command
+/// Builder's choice). `None` when an argument cannot be quoted safely.
+pub fn runnable_command(argv: &[String], shell: Shell) -> Option<String> {
+    let mut parts = vec!["sf".to_owned()];
+    for a in argv.iter().filter(|a| a.as_str() != "--json") {
+        parts.push(shell.quote(a).ok()?);
+    }
+    Some(parts.join(" "))
 }
 
 /// `label  value`, with the lines of a multi-line value aligned under the first.
